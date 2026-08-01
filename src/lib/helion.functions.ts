@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
-const MODEL = "google/gemini-2.5-flash";
+const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const MODEL = "gemini-2.5-flash";
 
 type Mode = "casual" | "tecnica";
 type Length = "curta" | "longa";
@@ -60,10 +60,13 @@ Se for sobre tecnologia:
 - Responda em texto puro (sem JSON, sem markdown com #). Pode usar **negrito** para destaque.`;
 }
 
-async function callGateway(body: unknown): Promise<string> {
-  const apiKey = process.env.LOVABLE_API_KEY;
-  if (!apiKey) throw new Error("LOVABLE_API_KEY not configured");
-  const res = await fetch(GATEWAY_URL, {
+export async function callGateway(
+  body: unknown,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+  const res = await fetchImpl(GATEWAY_URL, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -74,7 +77,7 @@ async function callGateway(body: unknown): Promise<string> {
   if (!res.ok) {
     const text = await res.text();
     if (res.status === 429) throw new Error("Limite de requisições. Tente novamente em instantes.");
-    if (res.status === 402) throw new Error("Créditos esgotados no workspace Lovable AI.");
+    if (res.status === 402) throw new Error("Créditos esgotados na conta do Gemini.");
     throw new Error(`Gateway ${res.status}: ${text.slice(0, 200)}`);
   }
   const data = await res.json();
