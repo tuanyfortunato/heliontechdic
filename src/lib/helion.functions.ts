@@ -1,7 +1,11 @@
 import { createServerFn } from "@tanstack/react-start";
 
 const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash returns 404 "no longer available to new users" for
+// newly-created API keys/projects; gemini-flash-latest is the current
+// flash-tier alias and works with this key (verified against the real
+// endpoint).
+const MODEL = "gemini-flash-latest";
 
 type Mode = "casual" | "tecnica";
 type Length = "curta" | "longa";

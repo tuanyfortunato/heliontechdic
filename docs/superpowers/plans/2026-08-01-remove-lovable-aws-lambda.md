@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- AI model stays `gemini-2.5-flash` (same model, called directly against Google's OpenAI-compatible endpoint — the `google/` prefix is dropped because that was a gateway-routing convention specific to the Lovable/OpenRouter-style proxy, not part of the model's own name).
+- AI model: `gemini-flash-latest`, called directly against Google's OpenAI-compatible endpoint — the `google/` prefix is dropped because that was a gateway-routing convention specific to the Lovable/OpenRouter-style proxy, not part of the model's own name. (Originally planned as `gemini-2.5-flash`; changed after real end-to-end testing showed the project's actual `GEMINI_API_KEY` gets `404: This model models/gemini-2.5-flash is no longer available to new users` from the live endpoint. `gemini-flash-latest` was verified working with the same key against the real API. Human-approved substitution.)
 - No custom domain, no ACM certificate — HTTPS is served by the AWS-managed certificate on the Lambda Function URL.
 - No VPC — the Lambda function runs outside any VPC (Supabase and the Gemini API are both public HTTPS endpoints).
 - Deployment package is a **zip**, not a container image — no Docker, no ECR.
@@ -346,7 +346,11 @@ with:
 import { createServerFn } from "@tanstack/react-start";
 
 const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const MODEL = "gemini-2.5-flash";
+// gemini-2.5-flash returns 404 "no longer available to new users" for
+// newly-created API keys/projects; gemini-flash-latest is the current
+// flash-tier alias and works with this key (verified against the real
+// endpoint).
+const MODEL = "gemini-flash-latest";
 ```
 
 Then replace the `callGateway` function (currently lines 63–82):
