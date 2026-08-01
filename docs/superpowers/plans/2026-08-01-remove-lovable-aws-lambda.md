@@ -110,7 +110,11 @@ export default defineConfig({
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
     tanstackStart(),
-    nitro({ preset: "aws-lambda", awsLambda: { streaming: true } }),
+    // nitro@3's vite plugin only merges `config` into Nitro's own options
+    // (pluginConfig.config, per node_modules/nitro/dist/_chunks/plugin.mjs) —
+    // top-level `preset`/`awsLambda` are silently ignored and the build falls
+    // back to the node-server preset, which has no `handler` export.
+    nitro({ config: { preset: "aws-lambda", awsLambda: { streaming: true } } }),
     viteReact(),
   ],
 });
