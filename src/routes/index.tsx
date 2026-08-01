@@ -68,9 +68,9 @@ function Helion() {
   const [termo, setTermo] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageName, setImageName] = useState<string | null>(null);
-  const [modo, setModo] = useState<Mode | null>(null);
-  const [tamanho, setTamanho] = useState<Length | null>(null);
-  const [analise, setAnalise] = useState<Analise | null>(null);
+  const [modo, setModo] = useState<Mode | null>("casual");
+  const [tamanho, setTamanho] = useState<Length | null>("curta");
+  const [analise, setAnalise] = useState<Analise | null>("padrao");
   const [loading, setLoading] = useState(false);
   const [resposta, setRespostaState] = useState<string | null>(null);
   const [foraEscopo, setForaEscopo] = useState(false);
@@ -108,9 +108,9 @@ function Helion() {
     setTermo("");
     setImageDataUrl(null);
     setImageName(null);
-    setModo(null);
-    setTamanho(null);
-    setAnalise(null);
+    setModo("casual");
+    setTamanho("curta");
+    setAnalise("padrao");
     setRespostaState(null);
     setForaEscopo(false);
     setErro(null);
