@@ -6,7 +6,7 @@
 
 **Architecture:** TanStack Start (React 19, Vite 7, Nitro) stays as-is architecturally; only the Vite config, the Cloudflare-specific server entry, and the AI gateway call change. Nitro's `aws-lambda` preset replaces the Cloudflare Workers preset, producing a zip-deployable Lambda handler invoked through a public Lambda Function URL (no API Gateway, no ALB, no VPC). Terraform manages all AWS resources across two root modules (`infra/bootstrap` applied once by hand, `infra/app` applied by CI); GitHub Actions authenticates to AWS via OIDC (no static keys) and runs two independent workflows — one that ships app code on every push, one that applies infra changes only when Terraform files change.
 
-**Tech Stack:** TanStack Start, Vite 7, Nitro (aws-lambda preset), React 19, Bun, Vitest (new), Terraform ~> 1.5, AWS Lambda/IAM/SSM/CloudWatch/S3/DynamoDB, GitHub Actions with OIDC.
+**Tech Stack:** TanStack Start, Vite 7, Nitro (aws-lambda preset), React 19, Bun, Vitest (new), Terraform >= 1.10, AWS Lambda/IAM/SSM/CloudWatch/S3, GitHub Actions with OIDC.
 
 ## Global Constraints
 
@@ -16,7 +16,7 @@
 - Deployment package is a **zip**, not a container image — no Docker, no ECR.
 - GitHub Actions authenticates to AWS via **OIDC** — no long-lived AWS access keys stored as repo secrets.
 - Secrets (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) live in **SSM Parameter Store** as `SecureString`, created once by hand, and are read by Terraform at `apply` time and injected as Lambda **environment variables** — the app itself makes no AWS API calls at runtime to fetch secrets.
-- Terraform state is remote: S3 bucket + DynamoDB lock table, created once via `infra/bootstrap` (required because CI runs `terraform apply` repeatedly and needs shared, locked state).
+- Terraform state is remote: S3 bucket with native S3 state locking (`use_lockfile = true`, requires Terraform >= 1.10), created once via `infra/bootstrap` (required because CI runs `terraform apply` repeatedly and needs shared, locked state — no DynamoDB lock table; the human partner chose to keep both GitHub Actions workflows but drop the second AWS resource in favor of S3's built-in lockfile).
 - AWS region: `us-east-1` (default, overridable via Terraform variable — no explicit region requirement was given, this is the reasonable low-cost default consistent with the earlier cost estimates in the design spec).
 - Lambda runtime: `nodejs22.x`.
 - Lambda Function URL: `authorization_type = "NONE"` (public site, no IAM auth) and `invoke_mode = "RESPONSE_STREAM"` (required to match `awsLambda: { streaming: true }` in the Nitro preset — the default `BUFFERED` mode would break SSR streaming).
@@ -33,7 +33,7 @@ The engineer's machine needs, before starting Task 1:
   powershell -c "irm bun.sh/install.ps1|iex"
   ```
   Then open a new shell and confirm: `bun --version`.
-- **AWS CLI v2**, **Terraform >= 1.5**, **GitHub CLI (`gh`)** — already installed and confirmed on this machine (`aws-cli/2.35.22`, `Terraform v1.15.8`, `gh 2.96.0`). If missing on another machine, install from the official AWS/HashiCorp/GitHub docs.
+- **AWS CLI v2**, **Terraform >= 1.10** (native S3 state locking requires it), **GitHub CLI (`gh`)** — already installed and confirmed on this machine (`aws-cli/2.35.22`, `Terraform v1.15.8`, `gh 2.96.0`). If missing on another machine, install from the official AWS/HashiCorp/GitHub docs.
 - AWS credentials configured for an account you control: `aws configure` (or `aws sso login` if using SSO), then confirm with `aws sts get-caller-identity`.
 - `gh auth login` (needed in Task 8/9 to set repo variables).
 
@@ -538,7 +538,7 @@ This completes Phase A — at this point `bun install && bun run dev` works with
 - Create: `infra/bootstrap/outputs.tf`
 
 **Interfaces:**
-- Produces (Terraform outputs, consumed by Task 6's backend config and Task 8/9's GitHub Actions repo variables): `state_bucket` (string), `lock_table` (string), `deploy_app_role_arn` (string), `deploy_infra_role_arn` (string).
+- Produces (Terraform outputs, consumed by Task 6's backend config and Task 8/9's GitHub Actions repo variables): `state_bucket` (string), `deploy_app_role_arn` (string), `deploy_infra_role_arn` (string).
 
 This module is applied **manually, once**, with your own local AWS credentials — it is never run from CI (it creates the very state backend and IAM roles that CI needs to exist first).
 
@@ -566,7 +566,9 @@ variable "github_repo" {
 
 ```hcl
 terraform {
-  required_version = ">= 1.5"
+  # >= 1.10 required for native S3 state locking (`use_lockfile`), used
+  # instead of a DynamoDB lock table -- see infra/app/backend.tf.
+  required_version = ">= 1.10"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -611,17 +613,6 @@ resource "aws_s3_bucket_public_access_block" "tf_state" {
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
-}
-
-resource "aws_dynamodb_table" "tf_lock" {
-  name         = "${var.project_name}-terraform-lock"
-  billing_mode = "PAY_PER_REQUEST"
-  hash_key     = "LockID"
-
-  attribute {
-    name = "LockID"
-    type = "S"
-  }
 }
 
 # --- GitHub OIDC provider + roles ---
@@ -721,10 +712,8 @@ data "aws_iam_policy_document" "deploy_infra_permissions" {
       "ssm:GetParameters",
       "s3:GetObject",
       "s3:PutObject",
+      "s3:DeleteObject", # native S3 lockfile is created and removed per apply
       "s3:ListBucket",
-      "dynamodb:GetItem",
-      "dynamodb:PutItem",
-      "dynamodb:DeleteItem",
     ]
     resources = ["*"]
   }
@@ -742,10 +731,6 @@ resource "aws_iam_role_policy" "deploy_infra" {
 ```hcl
 output "state_bucket" {
   value = aws_s3_bucket.tf_state.bucket
-}
-
-output "lock_table" {
-  value = aws_dynamodb_table.tf_lock.name
 }
 
 output "deploy_app_role_arn" {
@@ -766,7 +751,7 @@ terraform validate
 terraform plan
 ```
 
-Expected: `terraform validate` reports `Success!`; `terraform plan` shows resources to add: `aws_s3_bucket`, `aws_s3_bucket_versioning`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block`, `aws_dynamodb_table`, `aws_iam_openid_connect_provider`, `aws_iam_role` (x2), `aws_iam_role_policy` (x2) — 10 resources total, 0 to change, 0 to destroy.
+Expected: `terraform validate` reports `Success!`; `terraform plan` shows resources to add: `aws_s3_bucket`, `aws_s3_bucket_versioning`, `aws_s3_bucket_server_side_encryption_configuration`, `aws_s3_bucket_public_access_block`, `aws_iam_openid_connect_provider`, `aws_iam_role` (x2), `aws_iam_role_policy` (x2) — 9 resources total, 0 to change, 0 to destroy.
 
 - [ ] **Step 5: Apply**
 
@@ -774,17 +759,16 @@ Expected: `terraform validate` reports `Success!`; `terraform plan` shows resour
 terraform apply
 ```
 
-Type `yes` when prompted. Expected: `Apply complete! Resources: 10 added, 0 changed, 0 destroyed.`, followed by the four outputs.
+Type `yes` when prompted. Expected: `Apply complete! Resources: 9 added, 0 changed, 0 destroyed.`, followed by the three outputs.
 
 - [ ] **Step 6: Verify the resources exist in AWS**
 
 ```bash
 terraform output -raw state_bucket
 aws s3 ls | grep helion-terraform-state
-aws dynamodb describe-table --table-name helion-terraform-lock --query "Table.TableStatus"
 ```
 
-Expected: bucket name printed and found in `s3 ls`; table status `"ACTIVE"`.
+Expected: bucket name printed and found in `s3 ls`.
 
 - [ ] **Step 7: Record the outputs for later tasks**
 
@@ -792,7 +776,7 @@ Expected: bucket name printed and found in `s3 ls`; table status `"ACTIVE"`.
 terraform output
 ```
 
-Keep this output visible — Task 6 needs `state_bucket`/`lock_table` for the backend config, and Task 8/9 need `deploy_app_role_arn`/`deploy_infra_role_arn` for the GitHub repo variables. (Nothing here is secret — these are resource identifiers/ARNs, not credentials.)
+Keep this output visible — Task 6 needs `state_bucket` for the backend config, and Task 8/9 need `deploy_app_role_arn`/`deploy_infra_role_arn` for the GitHub repo variables. (Nothing here is secret — these are resource identifiers/ARNs, not credentials.)
 
 - [ ] **Step 8: Commit**
 
@@ -813,16 +797,17 @@ git commit -m "feat: add Terraform bootstrap (remote state backend, GitHub OIDC 
 - Create: `infra/app/terraform.tfvars.example`
 
 **Interfaces:**
-- Consumes: `state_bucket`/`lock_table` outputs from Task 5.
+- Consumes: `state_bucket` output from Task 5.
 - Produces: `aws_lambda_function.app` (Terraform resource name, consumed by Task 7's Function URL/permission and by Task 8's `aws lambda update-function-code` calls via its `function_name` output).
 
 - [ ] **Step 1: Create infra/app/backend.tf**
 
-Replace `helion-terraform-state` / `helion-terraform-lock` below only if Task 5's actual bucket/table names differ (they shouldn't, given the fixed `project_name` default):
+Replace `helion-terraform-state` below only if Task 5's actual bucket name differs (it shouldn't, given the fixed `project_name` default):
 
 ```hcl
 terraform {
-  required_version = ">= 1.5"
+  # >= 1.10 required for native S3 state locking (`use_lockfile`).
+  required_version = ">= 1.10"
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -831,11 +816,11 @@ terraform {
   }
 
   backend "s3" {
-    bucket         = "helion-terraform-state"
-    key            = "app/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "helion-terraform-lock"
-    encrypt        = true
+    bucket       = "helion-terraform-state"
+    key          = "app/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
 
