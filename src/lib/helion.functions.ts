@@ -109,6 +109,11 @@ export const humanize = createServerFn({ method: "POST" })
     const content = await callGateway({
       model: MODEL,
       max_tokens: 1200,
+      // gemini-flash-latest's thinking (reasoning) tokens count against
+      // max_tokens and can consume the whole budget before any visible
+      // content is emitted, truncating the response mid-sentence
+      // (finish_reason: "length") -- "low" leaves enough headroom.
+      reasoning_effort: "low",
       messages: [
         { role: "system", content: systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao") },
         { role: "user", content: userContent },
@@ -158,6 +163,9 @@ export const deepDive = createServerFn({ method: "POST" })
     const content = await callGateway({
       model: MODEL,
       max_tokens: isCode ? 2400 : 1800,
+      // see humanize() above -- without this, thinking tokens can eat the
+      // whole max_tokens budget and cut the JSON off mid-string.
+      reasoning_effort: "low",
       messages: [
         { role: "system", content: isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO },
         {
