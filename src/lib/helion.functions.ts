@@ -162,9 +162,12 @@ export const deepDive = createServerFn({ method: "POST" })
     const isCode = data.analise === "codigo";
     const content = await callGateway({
       model: MODEL,
-      max_tokens: isCode ? 2400 : 1800,
-      // see humanize() above -- without this, thinking tokens can eat the
-      // whole max_tokens budget and cut the JSON off mid-string.
+      // Generous headroom: even with reasoning_effort "low", the model
+      // behind the "-latest" alias can drift to a more verbose version
+      // over time (observed truncating a padrão response at ~1800 tokens
+      // after already emitting full profundidade+exemplo fields) -- see
+      // humanize() above for why reasoning_effort is set at all.
+      max_tokens: isCode ? 4200 : 3200,
       reasoning_effort: "low",
       messages: [
         { role: "system", content: isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO },
@@ -206,10 +209,27 @@ export const deepDive = createServerFn({ method: "POST" })
         exemplosLinks: parseLinks(parsed.exemplosLinks),
       };
     } catch {
+      // The gateway response got cut off mid-JSON (hit max_tokens before
+      // closing the object). Rather than show the broken JSON verbatim,
+      // salvage whichever string fields the model DID finish writing --
+      // each closed field is still valid within an otherwise-truncated
+      // object, since fields are emitted in schema order.
+      const field = (key: string): string => {
+        const m = jsonText.match(new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`, "s"));
+        if (!m) return "";
+        try {
+          return JSON.parse(`"${m[1]}"`);
+        } catch {
+          return m[1];
+        }
+      };
+      const profundidade = field("profundidade");
       return {
-        profundidade: content,
-        exemplo: "",
-        analogia: "",
+        // Last resort only: if not even `profundidade` could be salvaged,
+        // fall back to the raw text so nothing is silently lost.
+        profundidade: profundidade || content,
+        exemplo: field("exemplo"),
+        analogia: field("analogia"),
         relacionados: [] as string[],
         docLink: null as string | null,
         videos: [] as { titulo: string; url: string }[],
