@@ -10,7 +10,7 @@ export default defineConfig({
     tsConfigPaths({ projects: ["./tsconfig.json"] }),
     tailwindcss(),
     tanstackStart(),
-    nitro({ preset: "aws-lambda", awsLambda: { streaming: true } }),
+    nitro({ config: { preset: "aws-lambda", awsLambda: { streaming: true } } }),
     viteReact(),
   ],
 });
