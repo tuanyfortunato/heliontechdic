@@ -14,7 +14,7 @@ impedem rodar fora daquele ambiente:
    workspace do Lovable.
 2. O deploy alvo atual é Cloudflare Workers (`wrangler.jsonc` +
    `src/server.ts` como module worker + `@cloudflare/vite-plugin`).
-3. A funcionalidade central do produto (as duas *server functions* de IA em
+3. A funcionalidade central do produto (as duas _server functions_ de IA em
    `src/lib/helion.functions.ts`) chama o AI Gateway do Lovable
    (`ai.gateway.lovable.dev`), autenticado com `LOVABLE_API_KEY` — uma chave
    que só existe dentro de um workspace Lovable.
@@ -66,7 +66,7 @@ export default defineConfig({
 
 ### `src/server.ts` e `src/start.ts`
 
-- `src/server.ts` é removido: era o *module worker* do Cloudflare
+- `src/server.ts` é removido: era o _module worker_ do Cloudflare
   (`fetch(request, env, ctx)`); o preset `aws-lambda` do Nitro gera seu
   próprio handler compatível com Lambda, então essa camada deixa de existir
   como está.
@@ -142,13 +142,13 @@ Lambda com Function URL — duas outras opções (ECS Fargate + ALB, EC2
   HTTPS, então o Lambda roda fora de qualquer VPC, evitando a penalidade de
   cold start com ENI e qualquer custo de NAT Gateway.
 - **IAM**:
-  - *Role de execução do Lambda* (usada em runtime): apenas as permissões
+  - _Role de execução do Lambda_ (usada em runtime): apenas as permissões
     básicas de execução (`AWSLambdaBasicExecutionRole`, escrita em
     CloudWatch Logs). **Não** precisa de permissão de leitura no SSM, porque
     os segredos são injetados como variáveis de ambiente no momento do
     `terraform apply` (ver abaixo) — o código da aplicação nunca faz uma
     chamada à AWS em runtime para buscar segredo.
-  - *Identidade que roda o Terraform* (o role OIDC do GitHub Actions usado
+  - _Identidade que roda o Terraform_ (o role OIDC do GitHub Actions usado
     pelo workflow de infra, ou as credenciais de quem faz o bootstrap
     inicial): precisa de `ssm:GetParameter`/`GetParameters` nos ARNs
     específicos dos parâmetros da app, e permissão de decrypt na KMS key
@@ -169,11 +169,11 @@ Lambda com Function URL — duas outras opções (ECS Fargate + ALB, EC2
 
 ### Alternativas consideradas e descartadas
 
-| Opção | Custo estimado/mês | Motivo da rejeição |
-|---|---|---|
-| ECS Fargate + Application Load Balancer | ~US$ 27-35 | ALB cobra uma taxa fixa por hora (~US$16-20) independente do tráfego — dominante e desnecessária para um app de poucas requisições. |
+| Opção                                       | Custo estimado/mês                          | Motivo da rejeição                                                                                                                                                          |
+| ------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ECS Fargate + Application Load Balancer     | ~US$ 27-35                                  | ALB cobra uma taxa fixa por hora (~US$16-20) independente do tráfego — dominante e desnecessária para um app de poucas requisições.                                         |
 | EC2 `t4g.micro` sem ALB, gerenciado com pm2 | US$ 0 (free tier 12 meses) / ~US$3-7 depois | Mais barato que Fargate+ALB, mas exige gerenciar o processo e o SO manualmente; Lambda é mais barato ainda e sem esse ônus operacional, dado o tráfego baixíssimo esperado. |
-| AWS App Runner | ~US$ 5-15 | Ainda mantém uma instância sempre ativa (custo de "provisionado" mesmo ocioso); Lambda com tráfego baixo tende a zero. |
+| AWS App Runner                              | ~US$ 5-15                                   | Ainda mantém uma instância sempre ativa (custo de "provisionado" mesmo ocioso); Lambda com tráfego baixo tende a zero.                                                      |
 
 ### Custo estimado
 
@@ -213,16 +213,16 @@ duração para vazar.
 
 ## Resumo das decisões
 
-| Decisão | Escolha |
-|---|---|
-| Compute AWS | AWS Lambda + Function URL |
-| Empacotamento | zip (sem Docker/ECR) |
-| Provedor de IA | Google Gemini, chamada direta (mesmo modelo `gemini-2.5-flash`) |
-| IaC | Terraform, state remoto em S3 + DynamoDB |
-| Secrets | SSM Parameter Store (`SecureString`), injetados como env var do Lambda pelo Terraform |
-| CI/CD | GitHub Actions, workflows separados para deploy de código e infra, autenticação via OIDC |
-| Domínio/HTTPS | Nenhum domínio próprio — HTTPS via Function URL padrão da AWS |
-| Cloudflare | Removido por completo (`wrangler.jsonc`, `@cloudflare/vite-plugin`) |
+| Decisão        | Escolha                                                                                  |
+| -------------- | ---------------------------------------------------------------------------------------- |
+| Compute AWS    | AWS Lambda + Function URL                                                                |
+| Empacotamento  | zip (sem Docker/ECR)                                                                     |
+| Provedor de IA | Google Gemini, chamada direta (mesmo modelo `gemini-2.5-flash`)                          |
+| IaC            | Terraform, state remoto em S3 + DynamoDB                                                 |
+| Secrets        | SSM Parameter Store (`SecureString`), injetados como env var do Lambda pelo Terraform    |
+| CI/CD          | GitHub Actions, workflows separados para deploy de código e infra, autenticação via OIDC |
+| Domínio/HTTPS  | Nenhum domínio próprio — HTTPS via Function URL padrão da AWS                            |
+| Cloudflare     | Removido por completo (`wrangler.jsonc`, `@cloudflare/vite-plugin`)                      |
 
 ## Próximos passos
 

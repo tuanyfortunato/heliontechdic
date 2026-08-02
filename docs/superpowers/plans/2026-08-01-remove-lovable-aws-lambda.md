@@ -15,7 +15,7 @@
 - No VPC — the Lambda function runs outside any VPC (Supabase is a public HTTPS endpoint; Amazon Bedrock is called via its regional public API endpoint, not a VPC endpoint).
 - Deployment package is a **zip**, not a container image — no Docker, no ECR.
 - GitHub Actions authenticates to AWS via **OIDC** — no long-lived AWS access keys stored as repo secrets.
-- Secrets: only `SUPABASE_SERVICE_ROLE_KEY` lives in **SSM Parameter Store** as `SecureString`, created once by hand, read by Terraform at `apply` time and injected as a Lambda **environment variable**. There is no Gemini/Bedrock API key to store — Bedrock access is authorized via the Lambda execution role's IAM policy (`bedrock:InvokeModel`/`bedrock:InvokeModelWithResponseStream`, scoped to the Claude Haiku 4.5 inference profile ARN), so the app *does* make one class of AWS API call at runtime now (Bedrock inference itself), just none to fetch secrets.
+- Secrets: only `SUPABASE_SERVICE_ROLE_KEY` lives in **SSM Parameter Store** as `SecureString`, created once by hand, read by Terraform at `apply` time and injected as a Lambda **environment variable**. There is no Gemini/Bedrock API key to store — Bedrock access is authorized via the Lambda execution role's IAM policy (`bedrock:InvokeModel`/`bedrock:InvokeModelWithResponseStream`, scoped to the Claude Haiku 4.5 inference profile ARN), so the app _does_ make one class of AWS API call at runtime now (Bedrock inference itself), just none to fetch secrets.
 - Terraform state is remote: S3 bucket with native S3 state locking (`use_lockfile = true`, requires Terraform >= 1.10), created once via `infra/bootstrap` (required because CI runs `terraform apply` repeatedly and needs shared, locked state — no DynamoDB lock table; the human partner chose to keep both GitHub Actions workflows but drop the second AWS resource in favor of S3's built-in lockfile).
 - AWS region: `us-east-1` (default, overridable via Terraform variable — no explicit region requirement was given, this is the reasonable low-cost default consistent with the earlier cost estimates in the design spec).
 - Lambda runtime: `nodejs22.x`.
@@ -42,6 +42,7 @@ The engineer's machine needs, before starting Task 1:
 ## Task 1: Replace Lovable's Vite config, remove Cloudflare deploy target
 
 **Files:**
+
 - Modify: `vite.config.ts`
 - Modify: `package.json:59` (remove `@lovable.dev/vite-tanstack-config` and `@cloudflare/vite-plugin` from `dependencies`/`devDependencies`)
 - Modify: `bunfig.toml`
@@ -49,6 +50,7 @@ The engineer's machine needs, before starting Task 1:
 - Delete: `.lovable/` (entire directory)
 
 **Interfaces:**
+
 - Produces: a `vite.config.ts` whose Nitro preset (`aws-lambda`) is consumed by Task 6/7 (the Terraform Lambda resource expects the build output this preset produces) and by Task 8 (the CI build step).
 
 - [ ] **Step 1: Delete the Lovable-only files**
@@ -152,11 +154,13 @@ git commit -m "chore: replace Lovable vite config with explicit config, drop Clo
 ## Task 2: Remove the Cloudflare Workers server entry and its dead-code helper
 
 **Files:**
+
 - Delete: `src/server.ts`
 - Delete: `src/lib/error-capture.ts`
 - Test: manual build verification (no dedicated test framework covers this file removal — see Step 2)
 
 **Interfaces:**
+
 - Consumes: `src/start.ts`'s existing `errorMiddleware` (unchanged) — confirmed to already cover the friendly-error-page behavior that `server.ts` used to provide via its own wrapper.
 - Produces: nothing new; this task only removes dead code so later tasks build cleanly.
 
@@ -207,12 +211,14 @@ git commit -m "chore: remove Cloudflare Workers server entry (dead code after dr
 > **SUPERSEDED (post-implementation, human decision):** this task's code below is the historical record of what was actually built and committed at the time. It was later replaced entirely — first by a same-provider model swap (`gemini-2.5-flash` → `gemini-flash-latest`, both superseded), then by a full provider migration off Gemini to **Amazon Bedrock / Claude Haiku 4.5** (see Global Constraints above for why). The current implementation lives in `src/lib/helion.functions.ts` and calls `callBedrock()` via `@aws-sdk/client-bedrock-runtime`'s `ConverseCommand`, not `callGateway()`/`fetch` as shown here. Do not use this section as a guide for the current codebase — it's kept only as a record of the migration path.
 
 **Files:**
+
 - Modify: `package.json` (add `vitest` devDependency, add `"test": "vitest run"` script)
 - Create: `vitest.config.ts`
 - Modify: `src/lib/helion.functions.ts:1-5,63-82`
 - Create: `src/lib/helion.functions.test.ts`
 
 **Interfaces:**
+
 - Produces: `export async function callGateway(body: unknown, fetchImpl: typeof fetch = fetch): Promise<string>` — exported (was module-private) so it can be unit-tested and so its signature is visible to anyone reading this file later. `humanize` and `deepDive` (already exported, unchanged signatures) keep calling `callGateway(body)` with no second argument, so runtime behavior for them is unaffected.
 
 - [ ] **Step 1: Add Vitest**
@@ -265,9 +271,7 @@ describe("callGateway", () => {
 
   it("throws when GEMINI_API_KEY is not configured", async () => {
     delete process.env.GEMINI_API_KEY;
-    await expect(callGateway({ foo: "bar" })).rejects.toThrow(
-      "GEMINI_API_KEY not configured",
-    );
+    await expect(callGateway({ foo: "bar" })).rejects.toThrow("GEMINI_API_KEY not configured");
   });
 
   it("calls the Gemini OpenAI-compatible endpoint with the API key and returns the message content", async () => {
@@ -303,9 +307,9 @@ describe("callGateway", () => {
       text: async () => "rate limited",
     });
 
-    await expect(
-      callGateway({}, fetchMock as unknown as typeof fetch),
-    ).rejects.toThrow("Limite de requisições");
+    await expect(callGateway({}, fetchMock as unknown as typeof fetch)).rejects.toThrow(
+      "Limite de requisições",
+    );
   });
 
   it("throws a specific message on HTTP 402", async () => {
@@ -316,9 +320,9 @@ describe("callGateway", () => {
       text: async () => "payment required",
     });
 
-    await expect(
-      callGateway({}, fetchMock as unknown as typeof fetch),
-    ).rejects.toThrow("Créditos esgotados");
+    await expect(callGateway({}, fetchMock as unknown as typeof fetch)).rejects.toThrow(
+      "Créditos esgotados",
+    );
   });
 });
 ```
@@ -383,10 +387,7 @@ async function callGateway(body: unknown): Promise<string> {
 with:
 
 ```ts
-export async function callGateway(
-  body: unknown,
-  fetchImpl: typeof fetch = fetch,
-): Promise<string> {
+export async function callGateway(body: unknown, fetchImpl: typeof fetch = fetch): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
   const res = await fetchImpl(GATEWAY_URL, {
@@ -445,6 +446,7 @@ git commit -m "feat: call Gemini directly instead of Lovable AI Gateway, add Vit
 ## Task 4: Remove cosmetic Lovable references, add .env.example, stop tracking .env
 
 **Files:**
+
 - Modify: `src/routes/__root.tsx:82`
 - Modify: `src/integrations/supabase/client.ts:16`
 - Modify: `src/integrations/supabase/client.server.ts:15`
@@ -454,6 +456,7 @@ git commit -m "feat: call Gemini directly instead of Lovable AI Gateway, add Vit
 - Delete (from git tracking only): `.env`
 
 **Interfaces:**
+
 - None — this task only touches strings/docs, no exported symbols change.
 
 - [ ] **Step 1: Remove the Lovable Twitter tag**
@@ -469,13 +472,13 @@ In `src/routes/__root.tsx`, remove this line (currently line 82):
 In `src/integrations/supabase/client.ts`, `src/integrations/supabase/client.server.ts`, and `src/integrations/supabase/auth-middleware.ts`, each has a line reading:
 
 ```ts
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
+const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
 ```
 
 Replace all three occurrences with:
 
 ```ts
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Set them in your .env file (see .env.example).`;
+const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Set them in your .env file (see .env.example).`;
 ```
 
 - [ ] **Step 3: Create .env.example**
@@ -539,11 +542,13 @@ This completes Phase A — at this point `bun install && bun run dev` works with
 ## Task 5: Terraform bootstrap — remote state backend + GitHub OIDC roles (applied once, by hand)
 
 **Files:**
+
 - Create: `infra/bootstrap/main.tf`
 - Create: `infra/bootstrap/variables.tf`
 - Create: `infra/bootstrap/outputs.tf`
 
 **Interfaces:**
+
 - Produces (Terraform outputs, consumed by Task 6's backend config and Task 8/9's GitHub Actions repo variables): `state_bucket` (string), `deploy_app_role_arn` (string), `deploy_infra_role_arn` (string).
 
 This module is applied **manually, once**, with your own local AWS credentials — it is never run from CI (it creates the very state backend and IAM roles that CI needs to exist first).
@@ -797,12 +802,14 @@ git commit -m "feat: add Terraform bootstrap (remote state backend, GitHub OIDC 
 ## Task 6: Terraform app module — Lambda execution role + Lambda function (first manual build & apply)
 
 **Files:**
+
 - Create: `infra/app/backend.tf`
 - Create: `infra/app/variables.tf`
 - Create: `infra/app/main.tf`
 - Create: `infra/app/terraform.tfvars.example`
 
 **Interfaces:**
+
 - Consumes: `state_bucket` output from Task 5.
 - Produces: `aws_lambda_function.app` (Terraform resource name, consumed by Task 7's Function URL/permission and by Task 8's `aws lambda update-function-code` calls via its `function_name` output).
 
@@ -1023,7 +1030,7 @@ aws lambda invoke --function-name helion-app --payload "{}" --cli-binary-format 
 cat /tmp/lambda-out.json
 ```
 
-Expected: the invoke succeeds (no `FunctionError` field in the CLI's own output) and `/tmp/lambda-out.json` contains a response object (a raw `{}` payload isn't a real Function URL event, so the response may be an error *from the app's own routing*, e.g. a 404 — that's fine here; the goal of this step is confirming the Lambda runtime boots the bundle and executes without crashing at cold start, not a full HTTP round-trip yet).
+Expected: the invoke succeeds (no `FunctionError` field in the CLI's own output) and `/tmp/lambda-out.json` contains a response object (a raw `{}` payload isn't a real Function URL event, so the response may be an error _from the app's own routing_, e.g. a 404 — that's fine here; the goal of this step is confirming the Lambda runtime boots the bundle and executes without crashing at cold start, not a full HTTP round-trip yet).
 
 - [ ] **Step 10: Commit**
 
@@ -1038,9 +1045,11 @@ git commit -m "feat: add Terraform Lambda function + execution role for HELION a
 ## Task 7: Lambda Function URL, CloudWatch log retention, first real end-to-end deploy
 
 **Files:**
+
 - Modify: `infra/app/main.tf`
 
 **Interfaces:**
+
 - Consumes: `aws_lambda_function.app` from Task 6.
 - Produces: `function_url` Terraform output (the public HTTPS URL for the app — this is the URL you'll actually open in a browser and the one CI's smoke test, if added later, would target).
 
@@ -1124,9 +1133,11 @@ This completes Phase B — the app is now live on AWS. Cost at this point: ~US$0
 ## Task 8: GitHub Actions — app deploy workflow (build, zip, update Lambda code)
 
 **Files:**
+
 - Create: `.github/workflows/deploy-app.yml`
 
 **Interfaces:**
+
 - Consumes: repo variables `AWS_DEPLOY_APP_ROLE_ARN`, `AWS_REGION`, `LAMBDA_FUNCTION_NAME` (set in Step 1 below, from Task 5/6 outputs).
 
 - [ ] **Step 1: Set the GitHub repo variables**
@@ -1214,9 +1225,11 @@ git commit -m "ci: add GitHub Actions workflow to deploy app code to Lambda on p
 ## Task 9: GitHub Actions — infra workflow (Terraform plan on PR, apply on main)
 
 **Files:**
+
 - Create: `.github/workflows/deploy-infra.yml`
 
 **Interfaces:**
+
 - Consumes: repo variable `AWS_DEPLOY_INFRA_ROLE_ARN` (set in Step 1 below, from Task 5's output).
 
 - [ ] **Step 1: Set the GitHub repo variable**

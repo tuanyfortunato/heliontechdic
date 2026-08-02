@@ -296,9 +296,16 @@ function Helion() {
 
           {/* UPLOAD ZONE */}
           <div
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver(true);
+            }}
             onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); handleFile(e.dataTransfer.files?.[0]); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              handleFile(e.dataTransfer.files?.[0]);
+            }}
             onClick={() => fileRef.current?.click()}
             style={{
               marginTop: 14,
@@ -326,13 +333,44 @@ function Helion() {
             />
             {imageDataUrl ? (
               <>
-                <img src={imageDataUrl} alt={imageName ?? ""} style={{ width: 40, height: 40, objectFit: "cover", borderRadius: 6, border: `1px solid ${C.amber}` }} />
-                <span style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{imageName}</span>
+                <img
+                  src={imageDataUrl}
+                  alt={imageName ?? ""}
+                  style={{
+                    width: 40,
+                    height: 40,
+                    objectFit: "cover",
+                    borderRadius: 6,
+                    border: `1px solid ${C.amber}`,
+                  }}
+                />
+                <span
+                  style={{
+                    flex: 1,
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {imageName}
+                </span>
                 <button
-                  onClick={(e) => { e.stopPropagation(); setImageDataUrl(null); setImageName(null); }}
-                  style={{ background: "transparent", border: "none", color: C.amber, cursor: "pointer", fontSize: 16 }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setImageDataUrl(null);
+                    setImageName(null);
+                  }}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: C.amber,
+                    cursor: "pointer",
+                    fontSize: 16,
+                  }}
                   aria-label="remover imagem"
-                >✕</button>
+                >
+                  ✕
+                </button>
               </>
             ) : (
               <span>Anexar captura de tela (opcional)</span>
@@ -395,7 +433,15 @@ function Helion() {
               />
             </div>
             {analise === "codigo" && !imageDataUrl && (
-              <p style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.amber, marginTop: 10, letterSpacing: "0.04em" }}>
+              <p
+                style={{
+                  fontFamily: FONT_MONO,
+                  fontSize: 11,
+                  color: C.amber,
+                  marginTop: 10,
+                  letterSpacing: "0.04em",
+                }}
+              >
                 Anexe uma captura de tela do código para ativar este modo.
               </p>
             )}
@@ -426,7 +472,15 @@ function Helion() {
             {loading ? "Processando…" : "Humanizar"}
           </button>
           {!canSubmit && (termo || imageDataUrl) && !loading && (
-            <p style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.textLt, textAlign: "center", marginTop: 12 }}>
+            <p
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 11,
+                color: C.textLt,
+                textAlign: "center",
+                marginTop: 12,
+              }}
+            >
               Selecione modo e tamanho para ativar
             </p>
           )}
@@ -434,23 +488,67 @@ function Helion() {
 
         {/* LOADING */}
         {loading && (
-          <div style={{ ...glassCard, marginTop: 20, display: "flex", alignItems: "center", gap: 16, justifyContent: "center", padding: 28 }}>
+          <div
+            style={{
+              ...glassCard,
+              marginTop: 20,
+              display: "flex",
+              alignItems: "center",
+              gap: 16,
+              justifyContent: "center",
+              padding: 28,
+            }}
+          >
             <Spinner />
-            <span style={{ fontFamily: FONT_MONO, color: C.textMd, fontSize: 13 }}>Processando</span>
+            <span style={{ fontFamily: FONT_MONO, color: C.textMd, fontSize: 13 }}>
+              Processando
+            </span>
           </div>
         )}
 
         {/* FORA DE ESCOPO */}
         {foraEscopo && !loading && (
           <div style={{ ...glassCard, marginTop: 20, borderColor: C.borderAmberHi }}>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: C.amber, letterSpacing: "0.16em", marginBottom: 6 }}>FORA DE ESCOPO</div>
-            <h3 style={{ fontFamily: FONT_DISPLAY, color: C.text, fontSize: 20, margin: "4px 0 12px", fontWeight: 600, letterSpacing: "-0.02em" }}>
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 11,
+                color: C.amber,
+                letterSpacing: "0.16em",
+                marginBottom: 6,
+              }}
+            >
+              FORA DE ESCOPO
+            </div>
+            <h3
+              style={{
+                fontFamily: FONT_DISPLAY,
+                color: C.text,
+                fontSize: 20,
+                margin: "4px 0 12px",
+                fontWeight: 600,
+                letterSpacing: "-0.02em",
+              }}
+            >
               Termo fora do domínio técnico.
             </h3>
             <p style={{ fontFamily: FONT_BODY, color: C.textMd, fontSize: 14, lineHeight: 1.6 }}>
               Este sistema processa apenas tecnologia. Tente um termo, sigla ou expressão da área.
             </p>
-            <button onClick={reset} style={{ marginTop: 16, padding: "10px 16px", borderRadius: 8, border: `1px solid ${C.border}`, background: "transparent", color: C.textMd, fontFamily: FONT_BODY, fontSize: 13, cursor: "pointer" }}>
+            <button
+              onClick={reset}
+              style={{
+                marginTop: 16,
+                padding: "10px 16px",
+                borderRadius: 8,
+                border: `1px solid ${C.border}`,
+                background: "transparent",
+                color: C.textMd,
+                fontFamily: FONT_BODY,
+                fontSize: 13,
+                cursor: "pointer",
+              }}
+            >
               Tentar novamente
             </button>
           </div>
@@ -459,7 +557,9 @@ function Helion() {
         {/* ERROR */}
         {erro && !loading && (
           <div style={{ ...glassCard, marginTop: 20, borderColor: `${C.danger}55` }}>
-            <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: C.danger }}>Erro: {erro}</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 13, color: C.danger }}>
+              Erro: {erro}
+            </span>
           </div>
         )}
 
@@ -476,7 +576,10 @@ function Helion() {
             {/* SCALE — Quanto nós te ajudamos? */}
             <HelpScale
               score={score}
-              onChange={(v) => { setScore(v); setScoreTouched(true); }}
+              onChange={(v) => {
+                setScore(v);
+                setScoreTouched(true);
+              }}
               current={currentScale}
             />
 
@@ -550,9 +653,11 @@ function Helion() {
         )}
       </div>
 
-      {deepOpen && resposta && (
+      {deepOpen &&
+        resposta &&
         (() => {
-          const langMatch = analise === "codigo" ? resposta.match(/Linguagem detectada:\*\*\s*([^\n*]+)/i) : null;
+          const langMatch =
+            analise === "codigo" ? resposta.match(/Linguagem detectada:\*\*\s*([^\n*]+)/i) : null;
           const deepTermo = langMatch?.[1]?.trim() || termo || "imagem enviada";
           return (
             <DeepDiveView
@@ -563,8 +668,7 @@ function Helion() {
               onAudit={() => setAuditOpen(true)}
             />
           );
-        })()
-      )}
+        })()}
 
       {auditOpen && (
         <AuditModal
@@ -576,8 +680,14 @@ function Helion() {
 
       {exitWarn && (
         <ExitWarnModal
-          onStay={() => { setExitWarn(false); setAuditOpen(true); }}
-          onLeave={() => { setExitWarn(false); reset(); }}
+          onStay={() => {
+            setExitWarn(false);
+            setAuditOpen(true);
+          }}
+          onLeave={() => {
+            setExitWarn(false);
+            reset();
+          }}
         />
       )}
 
@@ -589,8 +699,16 @@ function Helion() {
 
 /* ---------- SUB-COMPONENTS ---------- */
 function GlassOption({
-  active, onClick, label, desc,
-}: { active: boolean; onClick: () => void; label: string; desc: string }) {
+  active,
+  onClick,
+  label,
+  desc,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: string;
+  desc: string;
+}) {
   return (
     <button
       onClick={onClick}
@@ -608,10 +726,27 @@ function GlassOption({
         boxShadow: active ? `0 0 0 3px ${C.amberSoft}` : "none",
       }}
     >
-      <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 14, color: active ? C.amberHi : C.text, letterSpacing: "-0.01em" }}>
+      <div
+        style={{
+          fontFamily: FONT_DISPLAY,
+          fontWeight: 600,
+          fontSize: 14,
+          color: active ? C.amberHi : C.text,
+          letterSpacing: "-0.01em",
+        }}
+      >
         {label}
       </div>
-      <div style={{ fontFamily: FONT_MONO, fontSize: 11, fontWeight: 300, color: C.textXLt, marginTop: 4, lineHeight: 1.5 }}>
+      <div
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: 11,
+          fontWeight: 300,
+          color: C.textXLt,
+          marginTop: 4,
+          lineHeight: 1.5,
+        }}
+      >
         {desc}
       </div>
     </button>
@@ -620,7 +755,19 @@ function GlassOption({
 
 function Badge({ label }: { label: string }) {
   return (
-    <span style={{ fontFamily: FONT_MONO, fontSize: 10, letterSpacing: "0.14em", textTransform: "uppercase", padding: "4px 9px", borderRadius: 4, color: C.textMd, border: `1px solid ${C.border}`, background: "rgba(255,255,255,0.02)" }}>
+    <span
+      style={{
+        fontFamily: FONT_MONO,
+        fontSize: 10,
+        letterSpacing: "0.14em",
+        textTransform: "uppercase",
+        padding: "4px 9px",
+        borderRadius: 4,
+        color: C.textMd,
+        border: `1px solid ${C.border}`,
+        background: "rgba(255,255,255,0.02)",
+      }}
+    >
       {label}
     </span>
   );
@@ -637,7 +784,9 @@ function RichText({ text }: { text: string }) {
         <p key={i} style={{ margin: "0 0 14px" }}>
           {para.map((seg, j) =>
             seg.startsWith("**") && seg.endsWith("**") ? (
-              <strong key={j} style={{ color: C.text, fontWeight: 600 }}>{seg.slice(2, -2)}</strong>
+              <strong key={j} style={{ color: C.text, fontWeight: 600 }}>
+                {seg.slice(2, -2)}
+              </strong>
             ) : (
               <span key={j}>{seg}</span>
             ),
@@ -649,8 +798,14 @@ function RichText({ text }: { text: string }) {
 }
 
 function HelpScale({
-  score, onChange, current,
-}: { score: number; onChange: (v: number) => void; current: { phrase: string; icon: string; value: number } }) {
+  score,
+  onChange,
+  current,
+}: {
+  score: number;
+  onChange: (v: number) => void;
+  current: { phrase: string; icon: string; value: number };
+}) {
   return (
     <div
       style={{
@@ -659,13 +814,46 @@ function HelpScale({
         borderTop: `1px solid ${C.border}`,
       }}
     >
-      <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.16em", color: C.textLt, textTransform: "uppercase", marginBottom: 16, textAlign: "center" }}>
+      <div
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: C.textLt,
+          textTransform: "uppercase",
+          marginBottom: 16,
+          textAlign: "center",
+        }}
+      >
         Quanto nós te ajudamos?
       </div>
 
-      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 10, marginBottom: 12, minHeight: 56 }}>
-        <span style={{ fontSize: 28, filter: "drop-shadow(0 0 8px rgba(245,158,11,0.4))" }} aria-hidden>{current.icon}</span>
-        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 15, color: C.text, fontStyle: "italic", textAlign: "center", maxWidth: 380 }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 10,
+          marginBottom: 12,
+          minHeight: 56,
+        }}
+      >
+        <span
+          style={{ fontSize: 28, filter: "drop-shadow(0 0 8px rgba(245,158,11,0.4))" }}
+          aria-hidden
+        >
+          {current.icon}
+        </span>
+        <span
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 15,
+            color: C.text,
+            fontStyle: "italic",
+            textAlign: "center",
+            maxWidth: 380,
+          }}
+        >
           “{current.phrase}”
         </span>
       </div>
@@ -681,9 +869,24 @@ function HelpScale({
         aria-label="Quanto nós te ajudamos"
       />
 
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 10, fontFamily: FONT_MONO, fontSize: 10, color: C.textLt, letterSpacing: "0.08em" }}>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          marginTop: 10,
+          fontFamily: FONT_MONO,
+          fontSize: 10,
+          color: C.textLt,
+          letterSpacing: "0.08em",
+        }}
+      >
         {SCALE.map((s) => (
-          <span key={s.value} style={{ color: score === s.value ? C.amber : C.textLt, transition: "color 0.2s" }}>{s.value}%</span>
+          <span
+            key={s.value}
+            style={{ color: score === s.value ? C.amber : C.textLt, transition: "color 0.2s" }}
+          >
+            {s.value}%
+          </span>
         ))}
       </div>
     </div>
@@ -718,8 +921,14 @@ function AuditButton({ onClick, emphasized }: { onClick: () => void; emphasized?
 
 /* ---------- AUDIT MODAL ---------- */
 function AuditModal({
-  termo, resposta, onClose,
-}: { termo: string; resposta: string; onClose: () => void }) {
+  termo,
+  resposta,
+  onClose,
+}: {
+  termo: string;
+  resposta: string;
+  onClose: () => void;
+}) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -760,14 +969,35 @@ function AuditModal({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, letterSpacing: "0.22em", color: C.amber, textTransform: "uppercase", marginBottom: 14 }}>
+        <div
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 10.5,
+            letterSpacing: "0.22em",
+            color: C.amber,
+            textTransform: "uppercase",
+            marginBottom: 14,
+          }}
+        >
           Auditoria de precisão
         </div>
-        <p style={{ fontFamily: FONT_BODY, color: C.text, fontSize: 15, lineHeight: 1.6, margin: 0 }}>
+        <p
+          style={{ fontFamily: FONT_BODY, color: C.text, fontSize: 15, lineHeight: 1.6, margin: 0 }}
+        >
           Para nos ajudar a calibrar a precisão do Helion, aponte o erro encontrado.
         </p>
-        <p style={{ fontFamily: FONT_MONO, color: C.textLt, fontSize: 12, lineHeight: 1.6, marginTop: 8, fontWeight: 300 }}>
-          Se possível, inclua links de documentações oficiais, referências ou URLs de capturas de tela.
+        <p
+          style={{
+            fontFamily: FONT_MONO,
+            color: C.textLt,
+            fontSize: 12,
+            lineHeight: 1.6,
+            marginTop: 8,
+            fontWeight: 300,
+          }}
+        >
+          Se possível, inclua links de documentações oficiais, referências ou URLs de capturas de
+          tela.
         </p>
 
         {!sent ? (
@@ -796,7 +1026,16 @@ function AuditModal({
             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 18 }}>
               <button
                 onClick={onClose}
-                style={{ padding: "10px 18px", borderRadius: 10, border: `1px solid ${C.border}`, background: "transparent", color: C.textMd, fontFamily: FONT_BODY, fontSize: 13, cursor: "pointer" }}
+                style={{
+                  padding: "10px 18px",
+                  borderRadius: 10,
+                  border: `1px solid ${C.border}`,
+                  background: "transparent",
+                  color: C.textMd,
+                  fontFamily: FONT_BODY,
+                  fontSize: 13,
+                  cursor: "pointer",
+                }}
               >
                 Cancelar
               </button>
@@ -824,12 +1063,31 @@ function AuditModal({
             </div>
           </>
         ) : (
-          <div style={{ marginTop: 22, padding: 18, borderRadius: 12, background: C.amberSoft, border: `1px solid ${C.borderAmber}`, textAlign: "center" }}>
+          <div
+            style={{
+              marginTop: 22,
+              padding: 18,
+              borderRadius: 12,
+              background: C.amberSoft,
+              border: `1px solid ${C.borderAmber}`,
+              textAlign: "center",
+            }}
+          >
             <div style={{ fontSize: 28, marginBottom: 6 }}>✨</div>
-            <div style={{ fontFamily: FONT_DISPLAY, color: C.amberHi, fontSize: 15, fontWeight: 600 }}>
+            <div
+              style={{ fontFamily: FONT_DISPLAY, color: C.amberHi, fontSize: 15, fontWeight: 600 }}
+            >
               Contestação registrada.
             </div>
-            <div style={{ fontFamily: FONT_MONO, color: C.textLt, fontSize: 11, marginTop: 6, letterSpacing: "0.04em" }}>
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                color: C.textLt,
+                fontSize: 11,
+                marginTop: 6,
+                letterSpacing: "0.04em",
+              }}
+            >
               Alerta de alta prioridade despachado.
             </div>
           </div>
@@ -858,10 +1116,26 @@ function ExitWarnModal({ onStay, onLeave }: { onStay: () => void; onLeave: () =>
         }}
       >
         <div style={{ fontSize: 32, marginBottom: 8 }}>🦁</div>
-        <div style={{ fontFamily: FONT_DISPLAY, fontSize: 18, color: C.text, fontWeight: 600, lineHeight: 1.4 }}>
+        <div
+          style={{
+            fontFamily: FONT_DISPLAY,
+            fontSize: 18,
+            color: C.text,
+            fontWeight: 600,
+            lineHeight: 1.4,
+          }}
+        >
           Hey, ajuda a gente a ajudar todo mundo antes de sair…
         </div>
-        <p style={{ fontFamily: FONT_MONO, fontSize: 12, color: C.textLt, marginTop: 10, lineHeight: 1.6 }}>
+        <p
+          style={{
+            fontFamily: FONT_MONO,
+            fontSize: 12,
+            color: C.textLt,
+            marginTop: 10,
+            lineHeight: 1.6,
+          }}
+        >
           Sua contestação calibra a precisão do Helion para os próximos.
         </p>
         <div style={{ marginTop: 22, display: "flex", flexDirection: "column", gap: 10 }}>
@@ -908,7 +1182,9 @@ function ExitWarnModal({ onStay, onLeave }: { onStay: () => void; onLeave: () =>
 /* ---------- OVERLAY ---------- */
 function Overlay({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
     return () => {
@@ -975,7 +1251,11 @@ function InstitutionalFooter() {
 
 /* ---------- DEEP DIVE ---------- */
 function DeepDiveView({
-  termo, analise, contextoCodigo, onClose, onAudit,
+  termo,
+  analise,
+  contextoCodigo,
+  onClose,
+  onAudit,
 }: {
   termo: string;
   analise: Analise;
@@ -1000,45 +1280,132 @@ function DeepDiveView({
   const q = encodeURIComponent(termo);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50, background: C.bg, overflowY: "auto", animation: "slideIn 0.3s ease both" }}>
-      <div style={{ maxWidth: 760, margin: "0 auto", padding: "40px 24px 96px", position: "relative", zIndex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 50,
+        background: C.bg,
+        overflowY: "auto",
+        animation: "slideIn 0.3s ease both",
+      }}
+    >
+      <div
+        style={{
+          maxWidth: 760,
+          margin: "0 auto",
+          padding: "40px 24px 96px",
+          position: "relative",
+          zIndex: 1,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
           <div>
-            <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.16em", color: C.amber, textTransform: "uppercase", fontWeight: 500 }}>
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 11,
+                letterSpacing: "0.16em",
+                color: C.amber,
+                textTransform: "uppercase",
+                fontWeight: 500,
+              }}
+            >
               Compêndio Avançado
             </div>
-            <div style={{ fontFamily: FONT_DISPLAY, fontSize: 28, fontWeight: 600, color: C.text, letterSpacing: "-0.025em", marginTop: 4 }}>
+            <div
+              style={{
+                fontFamily: FONT_DISPLAY,
+                fontSize: 28,
+                fontWeight: 600,
+                color: C.text,
+                letterSpacing: "-0.025em",
+                marginTop: 4,
+              }}
+            >
               {termo}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "transparent", border: `1px solid ${C.border}`, padding: "10px 16px", borderRadius: 10, cursor: "pointer", fontFamily: FONT_BODY, fontSize: 13, color: C.textMd }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              padding: "10px 16px",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontFamily: FONT_BODY,
+              fontSize: 13,
+              color: C.textMd,
+            }}
+          >
             Voltar
           </button>
         </div>
         <div style={{ height: 1, background: C.border, margin: "28px 0" }} />
 
         {loading && (
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, padding: "60px 0" }}>
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 14,
+              padding: "60px 0",
+            }}
+          >
             <Spinner />
-            <span style={{ fontFamily: FONT_MONO, color: C.textMd, fontSize: 12 }}>Processando</span>
+            <span style={{ fontFamily: FONT_MONO, color: C.textMd, fontSize: 12 }}>
+              Processando
+            </span>
           </div>
         )}
 
         {err && (
-          <div style={{ background: C.surface, border: `1px solid ${C.danger}55`, padding: 16, borderRadius: 10, fontFamily: FONT_MONO, color: C.danger }}>
+          <div
+            style={{
+              background: C.surface,
+              border: `1px solid ${C.danger}55`,
+              padding: 16,
+              borderRadius: 10,
+              fontFamily: FONT_MONO,
+              color: C.danger,
+            }}
+          >
             Erro: {err}
           </div>
         )}
 
         {data && (
           <>
-            <DeepSection label="Exploração completa"><RichText text={data.profundidade} /></DeepSection>
+            <DeepSection label="Exploração completa">
+              <RichText text={data.profundidade} />
+            </DeepSection>
             {data.exemplo && (
-              <DeepSection label="Exemplo real"><RichText text={data.exemplo} /></DeepSection>
+              <DeepSection label="Exemplo real">
+                <RichText text={data.exemplo} />
+              </DeepSection>
             )}
             {data.analogia && (
               <DeepSection label="Analogia">
-                <p style={{ fontFamily: FONT_BODY, fontStyle: "italic", color: C.textMd, fontSize: 16, lineHeight: 1.65, margin: 0 }}>
+                <p
+                  style={{
+                    fontFamily: FONT_BODY,
+                    fontStyle: "italic",
+                    color: C.textMd,
+                    fontSize: 16,
+                    lineHeight: 1.65,
+                    margin: 0,
+                  }}
+                >
                   {data.analogia}
                 </p>
               </DeepSection>
@@ -1047,8 +1414,22 @@ function DeepDiveView({
               <DeepSection label="Conceitos relacionados">
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {data.relacionados.map((r: string) => (
-                    <a key={r} href={`https://www.google.com/search?q=${encodeURIComponent(r)}`} target="_blank" rel="noreferrer"
-                       style={{ padding: "6px 12px", borderRadius: 6, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, color: C.amber, fontFamily: FONT_BODY, fontSize: 13, textDecoration: "none" }}>
+                    <a
+                      key={r}
+                      href={`https://www.google.com/search?q=${encodeURIComponent(r)}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: 6,
+                        background: "rgba(255,255,255,0.02)",
+                        border: `1px solid ${C.border}`,
+                        color: C.amber,
+                        fontFamily: FONT_BODY,
+                        fontSize: 13,
+                        textDecoration: "none",
+                      }}
+                    >
                       {r}
                     </a>
                   ))}
@@ -1057,11 +1438,27 @@ function DeepDiveView({
             )}
             <DeepSection label="Para aprender mais">
               <div style={{ display: "grid", gap: 10 }}>
-                <LinkCard title="YouTube" subtitle={`Vídeos sobre "${termo}"`} href={`https://www.youtube.com/results?search_query=${q}`} />
-                <LinkCard title="Wikipédia" subtitle="Artigo enciclopédico" href={`https://pt.wikipedia.org/wiki/Special:Search?search=${q}`} />
-                <LinkCard title="Busca avançada" subtitle="Google + tutorial" href={`https://www.google.com/search?q=${q}+tutorial`} />
+                <LinkCard
+                  title="YouTube"
+                  subtitle={`Vídeos sobre "${termo}"`}
+                  href={`https://www.youtube.com/results?search_query=${q}`}
+                />
+                <LinkCard
+                  title="Wikipédia"
+                  subtitle="Artigo enciclopédico"
+                  href={`https://pt.wikipedia.org/wiki/Special:Search?search=${q}`}
+                />
+                <LinkCard
+                  title="Busca avançada"
+                  subtitle="Google + tutorial"
+                  href={`https://www.google.com/search?q=${q}+tutorial`}
+                />
                 {data.docLink && (
-                  <LinkCard title="Documentação oficial" subtitle="Fonte primária" href={data.docLink} />
+                  <LinkCard
+                    title="Documentação oficial"
+                    subtitle="Fonte primária"
+                    href={data.docLink}
+                  />
                 )}
               </div>
             </DeepSection>
@@ -1070,7 +1467,12 @@ function DeepDiveView({
               <DeepSection label="Vídeos recomendados">
                 <div style={{ display: "grid", gap: 10 }}>
                   {data.videos.map((v) => (
-                    <LinkCard key={v.url} title={v.titulo} subtitle="YouTube · vídeo" href={v.url} />
+                    <LinkCard
+                      key={v.url}
+                      title={v.titulo}
+                      subtitle="YouTube · vídeo"
+                      href={v.url}
+                    />
                   ))}
                 </div>
               </DeepSection>
@@ -1088,7 +1490,12 @@ function DeepDiveView({
               <DeepSection label="Exemplos práticos">
                 <div style={{ display: "grid", gap: 10 }}>
                   {data.exemplosLinks.map((v) => (
-                    <LinkCard key={v.url} title={v.titulo} subtitle="Exemplo / repositório" href={v.url} />
+                    <LinkCard
+                      key={v.url}
+                      title={v.titulo}
+                      subtitle="Exemplo / repositório"
+                      href={v.url}
+                    />
                   ))}
                 </div>
               </DeepSection>
@@ -1108,10 +1515,29 @@ function DeepDiveView({
 function DeepSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <section style={{ marginTop: 28 }}>
-      <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: "0.16em", color: C.textLt, textTransform: "uppercase", marginBottom: 12, fontWeight: 400 }}>
+      <div
+        style={{
+          fontFamily: FONT_MONO,
+          fontSize: 11,
+          letterSpacing: "0.16em",
+          color: C.textLt,
+          textTransform: "uppercase",
+          marginBottom: 12,
+          fontWeight: 400,
+        }}
+      >
         {label}
       </div>
-      <div style={{ background: C.surface, backdropFilter: "blur(10px)", WebkitBackdropFilter: "blur(10px)", border: `1px solid ${C.border}`, borderRadius: 14, padding: 22 }}>
+      <div
+        style={{
+          background: C.surface,
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          border: `1px solid ${C.border}`,
+          borderRadius: 14,
+          padding: 22,
+        }}
+      >
         {children}
       </div>
     </section>
@@ -1120,11 +1546,30 @@ function DeepSection({ label, children }: { label: string; children: React.React
 
 function LinkCard({ title, subtitle, href }: { title: string; subtitle: string; href: string }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer"
-       style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: `1px solid ${C.border}`, textDecoration: "none", color: C.text, transition: "all 0.15s" }}>
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "14px 16px",
+        borderRadius: 10,
+        background: "rgba(255,255,255,0.02)",
+        border: `1px solid ${C.border}`,
+        textDecoration: "none",
+        color: C.text,
+        transition: "all 0.15s",
+      }}
+    >
       <div style={{ flex: 1 }}>
-        <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 14, color: C.text }}>{title}</div>
-        <div style={{ fontFamily: FONT_BODY, color: C.textLt, fontSize: 12, marginTop: 2 }}>{subtitle}</div>
+        <div style={{ fontFamily: FONT_DISPLAY, fontWeight: 600, fontSize: 14, color: C.text }}>
+          {title}
+        </div>
+        <div style={{ fontFamily: FONT_BODY, color: C.textLt, fontSize: 12, marginTop: 2 }}>
+          {subtitle}
+        </div>
       </div>
       <span style={{ fontFamily: FONT_MONO, color: C.amber }}>→</span>
     </a>
