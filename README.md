@@ -9,7 +9,7 @@ Se o termo/imagem não for sobre tecnologia, a IA responde que está fora do esc
 | Camada                     | Tecnologia                                                                                                                                                                                                 |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Framework                  | [TanStack Start](https://tanstack.com/start) (SSR) + [TanStack Router](https://tanstack.com/router)                                                                                                        |
-| UI                         | React 19, Tailwind CSS 4, componentes Radix UI no estilo [shadcn/ui](https://ui.shadcn.com)                                                                                                                |
+| UI                         | React 19, estilos inline (design tokens em `index.tsx`) + Tailwind CSS 4 só para o reset/base (`src/styles.css`) — não usa shadcn/ui                                                                       |
 | Dados/estado               | TanStack Query                                                                                                                                                                                             |
 | Build                      | Vite 7 + Nitro (preset `aws-lambda`, streaming habilitado)                                                                                                                                                 |
 | IA                         | **Amazon Bedrock** — Claude Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`), chamado via `@aws-sdk/client-bedrock-runtime` (`ConverseCommand`), autenticado por credenciais IAM (não há API key) |
@@ -29,8 +29,6 @@ src/
     helion.functions.ts       # server functions: humanize() e deepDive() (chamam o Bedrock)
     helion.functions.test.ts   # testes da integração com o Bedrock (client mockado)
     error-page.ts               # página HTML de erro genérica
-    utils.ts
-  components/ui/                 # componentes shadcn/ui (Radix + Tailwind)
   start.ts                        # configuração do TanStack Start (middlewares globais)
   router.tsx                       # criação do router + query client
 infra/

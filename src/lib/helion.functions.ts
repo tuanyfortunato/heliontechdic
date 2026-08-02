@@ -99,12 +99,12 @@ export async function callBedrock(
     );
     const block = res.output?.message?.content?.[0];
     return block && "text" in block ? (block.text ?? "") : "";
-  } catch (err: any) {
-    if (err?.name === "ThrottlingException")
+  } catch (err: unknown) {
+    const name = err instanceof Error ? err.name : undefined;
+    if (name === "ThrottlingException")
       throw new Error("Limite de requisições. Tente novamente em instantes.");
-    throw new Error(
-      `Bedrock ${err?.name ?? "error"}: ${String(err?.message ?? err).slice(0, 200)}`,
-    );
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Bedrock ${name ?? "error"}: ${message.slice(0, 200)}`);
   }
 }
 
@@ -194,7 +194,10 @@ export const deepDive = createServerFn({ method: "POST" })
         Array.isArray(arr)
           ? arr
               .slice(0, 5)
-              .map((it: any) => ({ titulo: String(it?.titulo ?? ""), url: String(it?.url ?? "") }))
+              .map((it: unknown) => {
+                const obj = it as { titulo?: unknown; url?: unknown } | null | undefined;
+                return { titulo: String(obj?.titulo ?? ""), url: String(obj?.url ?? "") };
+              })
               .filter((it) => it.titulo && it.url)
           : [];
       return {

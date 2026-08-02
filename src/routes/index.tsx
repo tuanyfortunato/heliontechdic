@@ -150,8 +150,8 @@ function Helion() {
       const out = await callHumanize({ data: { termo, modo, tamanho, imageDataUrl, analise } });
       if (out.foraDeEscopo) setForaEscopo(true);
       else setRespostaState(out.texto);
-    } catch (e: any) {
-      setErro(e?.message ?? "Falha na requisição.");
+    } catch (e: unknown) {
+      setErro(e instanceof Error ? e.message : "Falha na requisição.");
     } finally {
       setLoading(false);
     }
@@ -946,7 +946,6 @@ function AuditModal({
       timestamp: new Date().toISOString(),
       priority: "high",
     };
-    // eslint-disable-next-line no-console
     console.info("[HELION · AUDIT BACKLOG]", payload);
     await new Promise((r) => setTimeout(r, 600));
     setSending(false);
@@ -1272,7 +1271,7 @@ function DeepDiveView({
     setLoading(true);
     callDeep({ data: { termo, analise, contextoCodigo } })
       .then((d) => setData(d))
-      .catch((e: any) => setErr(e?.message ?? "Falha ao carregar compêndio"))
+      .catch((e: unknown) => setErr(e instanceof Error ? e.message : "Falha ao carregar compêndio"))
       .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [termo, analise]);
