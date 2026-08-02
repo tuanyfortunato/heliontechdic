@@ -68,7 +68,7 @@ export async function callGemini(
   userContent: GeminiContentBlock[],
   maxTokens: number,
   fetchImpl: typeof fetch = fetch,
-): Promise<string>
+): Promise<string>;
 ```
 
 Erros mapeados como no código histórico: HTTP 429 → "Limite de requisições.
@@ -119,10 +119,10 @@ necessária ali.
 
 Adicionar a `.env`, `.env.example` e à tabela de env vars do README:
 
-| Variável | Uso |
-|---|---|
-| `AI_PROVIDER` (opcional) | `"bedrock"` (padrão) ou `"gemini"` |
-| `GEMINI_API_KEY` | Obrigatória apenas se `AI_PROVIDER=gemini`; chave da API do Gemini |
+| Variável                 | Uso                                                                |
+| ------------------------ | ------------------------------------------------------------------ |
+| `AI_PROVIDER` (opcional) | `"bedrock"` (padrão) ou `"gemini"`                                 |
+| `GEMINI_API_KEY`         | Obrigatória apenas se `AI_PROVIDER=gemini`; chave da API do Gemini |
 
 ### Documentação
 

@@ -44,11 +44,13 @@ A aplicação é essencialmente uma única rota (`/`) com um formulário complex
 
 Crie um arquivo `.env` (veja `.env.example`) com:
 
-| Variável                | Uso                                               |
-| ----------------------- | ------------------------------------------------- |
-| `AWS_REGION` (opcional) | Região do Bedrock — padrão `us-east-1` se omitida |
+| Variável                 | Uso                                                                      |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `AWS_REGION` (opcional)  | Região do Bedrock — padrão `us-east-1` se omitida                        |
+| `AI_PROVIDER` (opcional) | `"bedrock"` (padrão) ou `"gemini"` — escolhe qual IA os endpoints chamam |
+| `GEMINI_API_KEY`         | Obrigatória apenas se `AI_PROVIDER=gemini`                               |
 
-**Não há API key de IA para configurar.** O acesso ao Bedrock é via credenciais IAM: rode `aws configure` (ou `aws sso login`) localmente antes de `bun run dev`, para que o SDK da AWS encontre suas credenciais automaticamente. Em produção, a Lambda usa sua própria role de execução (sem credenciais explícitas).
+**Com o provider padrão (Bedrock), não há API key de IA para configurar.** O acesso é via credenciais IAM: rode `aws configure` (ou `aws sso login`) localmente antes de `bun run dev`, para que o SDK da AWS encontre suas credenciais automaticamente. Em produção, a Lambda usa sua própria role de execução (sem credenciais explícitas). Se `AI_PROVIDER=gemini`, defina `GEMINI_API_KEY` — esse caminho usa uma chave de API normal, não credenciais IAM.
 
 As variáveis com prefixo `VITE_` ficam visíveis no bundle do client; as demais só existem no servidor.
 
@@ -81,6 +83,8 @@ O projeto passou por três providers de IA até chegar no atual:
    - Custo estimado para o volume esperado (~100 requisições/dia): ~US$13/mês — mais caro que as opções mais baratas do Bedrock (Nova Lite/Pro), mas escolhido pela maior confiabilidade de seguimento de instrução/JSON depois do histórico de truncamento.
 
 A implementação vive inteiramente em `src/lib/helion.functions.ts`: `callBedrock()` monta o `ConverseCommand` (system prompt + conteúdo do usuário, incluindo imagens como bytes base64 decodificados de uma data URL) e mapeia erros da AWS (`ThrottlingException`, etc.) para mensagens amigáveis. O parsing do JSON do Compêndio Avançado tem um fallback: se a resposta for cortada no meio (estourou `max_tokens`), o código recupera via regex os campos que já foram totalmente escritos em vez de mostrar o JSON quebrado na tela.
+
+Desde 2026-08-01, o Gemini voltou como opção explícita via `AI_PROVIDER=gemini` (não é mais o default) — útil enquanto a cota do Bedrock não libera na conta AWS nova (ver "Status atual" abaixo). O Bedrock continua sendo o caminho validado/recomendado por causa do histórico de truncamento descrito acima; a implementação do Gemini (`callGemini()`) reaplica as mesmas mitigações (`reasoning_effort: "low"`, `max_tokens` generoso) que resolveram o problema da última vez que esse provider esteve em produção.
 
 ## Deploy na AWS
 

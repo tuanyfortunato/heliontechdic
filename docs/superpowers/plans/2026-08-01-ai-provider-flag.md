@@ -50,7 +50,6 @@ import { callBedrock, callGemini } from "./helion.functions";
 Then append this block at the end of the file:
 
 ```ts
-
 describe("callGemini", () => {
   beforeEach(() => {
     vi.stubEnv("GEMINI_API_KEY", "test-gemini-key");
@@ -189,8 +188,7 @@ export async function callGemini(
   });
   if (!res.ok) {
     const text = await res.text();
-    if (res.status === 429)
-      throw new Error("Limite de requisições. Tente novamente em instantes.");
+    if (res.status === 429) throw new Error("Limite de requisições. Tente novamente em instantes.");
     if (res.status === 402) throw new Error("Créditos esgotados na conta do Gemini.");
     throw new Error(`Gemini ${res.status}: ${text.slice(0, 200)}`);
   }
@@ -235,7 +233,6 @@ git commit -m "feat: add callGemini() as an alternate AI transport"
 Append to `src/lib/helion.functions.test.ts` (after the `callGemini` describe block added in Task 1):
 
 ```ts
-
 describe("getProvider", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
@@ -391,50 +388,50 @@ export async function callAI(
 Then, inside `humanize()`'s handler, replace:
 
 ```ts
-    const userContent: ContentBlock[] = [{ text: userText }];
-    if (data.imageDataUrl) {
-      userContent.push({ image: parseDataUrl(data.imageDataUrl) });
-    }
+const userContent: ContentBlock[] = [{ text: userText }];
+if (data.imageDataUrl) {
+  userContent.push({ image: parseDataUrl(data.imageDataUrl) });
+}
 
-    // Claude's extended thinking is opt-in (unlike Gemini's default-on
-    // thinking, which repeatedly ate the max_tokens budget and truncated
-    // responses) -- it's left disabled here, so the whole budget goes to
-    // visible output.
-    const content = await callBedrock(
-      systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
-      userContent,
-      1200,
-    );
+// Claude's extended thinking is opt-in (unlike Gemini's default-on
+// thinking, which repeatedly ate the max_tokens budget and truncated
+// responses) -- it's left disabled here, so the whole budget goes to
+// visible output.
+const content = await callBedrock(
+  systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
+  userContent,
+  1200,
+);
 ```
 
 with:
 
 ```ts
-    const content = await callAI(
-      systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
-      { text: userText, imageDataUrl: data.imageDataUrl },
-      1200,
-    );
+const content = await callAI(
+  systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
+  { text: userText, imageDataUrl: data.imageDataUrl },
+  1200,
+);
 ```
 
 And inside `deepDive()`'s handler, replace:
 
 ```ts
-    const content = await callBedrock(
-      isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
-      [{ text: userText }],
-      isCode ? 4200 : 3200,
-    );
+const content = await callBedrock(
+  isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
+  [{ text: userText }],
+  isCode ? 4200 : 3200,
+);
 ```
 
 with:
 
 ```ts
-    const content = await callAI(
-      isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
-      { text: userText },
-      isCode ? 4200 : 3200,
-    );
+const content = await callAI(
+  isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
+  { text: userText },
+  isCode ? 4200 : 3200,
+);
 ```
 
 - [ ] **Step 4: Run tests to verify they pass**
