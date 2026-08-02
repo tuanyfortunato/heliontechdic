@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { callBedrock, callGemini } from "./helion.functions";
+import { callBedrock, callGemini, getProvider, callAI } from "./helion.functions";
 
 describe("callBedrock", () => {
   it("calls Converse with system/messages/maxTokens and returns the text content", async () => {
@@ -130,5 +130,105 @@ describe("callGemini", () => {
     await expect(
       callGemini("s", [{ type: "text", text: "hi" }], 100, fetchMock as unknown as typeof fetch),
     ).rejects.toThrow("Gemini 500: internal error");
+  });
+});
+
+describe("getProvider", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("defaults to bedrock when AI_PROVIDER is unset", () => {
+    expect(getProvider()).toBe("bedrock");
+  });
+
+  it("returns gemini when AI_PROVIDER=gemini (case-insensitive)", () => {
+    vi.stubEnv("AI_PROVIDER", "Gemini");
+    expect(getProvider()).toBe("gemini");
+  });
+
+  it("falls back to bedrock for unrecognized values", () => {
+    vi.stubEnv("AI_PROVIDER", "openai");
+    expect(getProvider()).toBe("bedrock");
+  });
+});
+
+describe("callAI", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("routes to Bedrock by default", async () => {
+    const sendMock = vi.fn().mockResolvedValue({
+      output: { message: { content: [{ text: "bedrock reply" }] } },
+    });
+    const fetchMock = vi.fn();
+
+    const result = await callAI("system", { text: "hi" }, 100, {
+      bedrockClient: { send: sendMock },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(result).toBe("bedrock reply");
+    expect(sendMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("routes to Gemini when AI_PROVIDER=gemini", async () => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    const sendMock = vi.fn();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "gemini reply" } }] }),
+      text: async () => "",
+    });
+
+    const result = await callAI("system", { text: "hi" }, 100, {
+      bedrockClient: { send: sendMock },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    expect(result).toBe("gemini reply");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
+
+  it("includes the image in the Bedrock content when imageDataUrl is set", async () => {
+    const sendMock = vi.fn().mockResolvedValue({
+      output: { message: { content: [{ text: "ok" }] } },
+    });
+
+    await callAI("system", { text: "hi", imageDataUrl: "data:image/png;base64,AAAA" }, 100, {
+      bedrockClient: { send: sendMock },
+    });
+
+    const command = sendMock.mock.calls[0][0];
+    expect(command.input.messages[0].content).toEqual([
+      { text: "hi" },
+      { image: { format: "png", source: { bytes: expect.any(Uint8Array) } } },
+    ]);
+  });
+
+  it("includes the image in the Gemini content when imageDataUrl is set", async () => {
+    vi.stubEnv("AI_PROVIDER", "gemini");
+    vi.stubEnv("GEMINI_API_KEY", "test-key");
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: "ok" } }] }),
+      text: async () => "",
+    });
+
+    await callAI("system", { text: "hi", imageDataUrl: "data:image/png;base64,AAAA" }, 100, {
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.messages[1].content).toEqual([
+      { type: "text", text: "hi" },
+      { type: "image_url", image_url: { url: "data:image/png;base64,AAAA" } },
+    ]);
   });
 });

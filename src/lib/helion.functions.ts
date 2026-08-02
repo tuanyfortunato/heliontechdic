@@ -158,6 +158,40 @@ export async function callGemini(
   return data.choices?.[0]?.message?.content ?? "";
 }
 
+export function getProvider(): "bedrock" | "gemini" {
+  return process.env.AI_PROVIDER?.trim().toLowerCase() === "gemini" ? "gemini" : "bedrock";
+}
+
+interface AIContent {
+  text: string;
+  imageDataUrl?: string | null;
+}
+
+interface CallAIDeps {
+  bedrockClient?: Pick<BedrockRuntimeClient, "send">;
+  fetchImpl?: typeof fetch;
+}
+
+export async function callAI(
+  system: string,
+  content: AIContent,
+  maxTokens: number,
+  deps: CallAIDeps = {},
+): Promise<string> {
+  if (getProvider() === "gemini") {
+    const userContent: GeminiContentBlock[] = [{ type: "text", text: content.text }];
+    if (content.imageDataUrl) {
+      userContent.push({ type: "image_url", image_url: { url: content.imageDataUrl } });
+    }
+    return callGemini(system, userContent, maxTokens, deps.fetchImpl);
+  }
+  const userContent: ContentBlock[] = [{ text: content.text }];
+  if (content.imageDataUrl) {
+    userContent.push({ image: parseDataUrl(content.imageDataUrl) });
+  }
+  return callBedrock(system, userContent, maxTokens, deps.bedrockClient);
+}
+
 export const humanize = createServerFn({ method: "POST" })
   .inputValidator((d: HumanizeInput) => d)
   .handler(async ({ data }) => {
@@ -167,18 +201,9 @@ export const humanize = createServerFn({ method: "POST" })
       : data.imageDataUrl
         ? `Identifique e explique os jargões, siglas ou expressões técnicas presentes nesta imagem.${data.termo ? ` Contexto adicional do usuário: "${data.termo}".` : ""}`
         : `Explique o seguinte termo/sigla/expressão de tecnologia: "${data.termo}"`;
-    const userContent: ContentBlock[] = [{ text: userText }];
-    if (data.imageDataUrl) {
-      userContent.push({ image: parseDataUrl(data.imageDataUrl) });
-    }
-
-    // Claude's extended thinking is opt-in (unlike Gemini's default-on
-    // thinking, which repeatedly ate the max_tokens budget and truncated
-    // responses) -- it's left disabled here, so the whole budget goes to
-    // visible output.
-    const content = await callBedrock(
+    const content = await callAI(
       systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
-      userContent,
+      { text: userText, imageDataUrl: data.imageDataUrl },
       1200,
     );
 
@@ -225,9 +250,9 @@ export const deepDive = createServerFn({ method: "POST" })
     const userText = isCode
       ? `Linguagem/termo: ${data.termo}.${data.contextoCodigo ? ` Contexto do código analisado: ${data.contextoCodigo}` : ""}`
       : `Termo: ${data.termo}`;
-    const content = await callBedrock(
+    const content = await callAI(
       isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
-      [{ text: userText }],
+      { text: userText },
       isCode ? 4200 : 3200,
     );
     let jsonText = content.trim();
