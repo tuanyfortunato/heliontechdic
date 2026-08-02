@@ -6,16 +6,16 @@
 
 **Architecture:** TanStack Start (React 19, Vite 7, Nitro) stays as-is architecturally; only the Vite config, the Cloudflare-specific server entry, and the AI gateway call change. Nitro's `aws-lambda` preset replaces the Cloudflare Workers preset, producing a zip-deployable Lambda handler invoked through a public Lambda Function URL (no API Gateway, no ALB, no VPC). Terraform manages all AWS resources across two root modules (`infra/bootstrap` applied once by hand, `infra/app` applied by CI); GitHub Actions authenticates to AWS via OIDC (no static keys) and runs two independent workflows — one that ships app code on every push, one that applies infra changes only when Terraform files change.
 
-**Tech Stack:** TanStack Start, Vite 7, Nitro (aws-lambda preset), React 19, Bun, Vitest (new), Terraform >= 1.10, AWS Lambda/IAM/SSM/CloudWatch/S3, GitHub Actions with OIDC.
+**Tech Stack:** TanStack Start, Vite 7, Nitro (aws-lambda preset), React 19, Bun, Vitest (new), Terraform >= 1.10, AWS Lambda/IAM/SSM/CloudWatch/S3/Bedrock (`@aws-sdk/client-bedrock-runtime`), GitHub Actions with OIDC.
 
 ## Global Constraints
 
-- AI model: `gemini-flash-latest`, called directly against Google's OpenAI-compatible endpoint — the `google/` prefix is dropped because that was a gateway-routing convention specific to the Lovable/OpenRouter-style proxy, not part of the model's own name. (Originally planned as `gemini-2.5-flash`; changed after real end-to-end testing showed the project's actual `GEMINI_API_KEY` gets `404: This model models/gemini-2.5-flash is no longer available to new users` from the live endpoint. `gemini-flash-latest` was verified working with the same key against the real API. Human-approved substitution.)
+- AI model: **Amazon Bedrock, Claude Haiku 4.5** (`us.anthropic.claude-haiku-4-5-20251001-v1:0`, a cross-region inference profile — the bare model ID rejects on-demand invocation), called via the AWS SDK (`@aws-sdk/client-bedrock-runtime`, `ConverseCommand`) using IAM credentials, not an API key. (Originally Gemini, called directly against Google's OpenAI-compatible endpoint. Went through two Gemini model substitutions first — `gemini-2.5-flash` 404'd as "no longer available to new users", then `gemini-flash-latest` repeatedly truncated JSON responses because Gemini's default-on "thinking" silently ate the `max_tokens` budget, twice, even after mitigation. Human decided to move off Gemini entirely and chose Bedrock specifically: cheapest realistic option at this app's volume [~100 req/day: Nova Lite ~$1/mo, Nova Pro ~$8/mo, Claude Haiku 4.5 ~$13/mo, vs. Gemini Flash ~$15-20/mo], Claude Haiku 4.5 chosen over the cheaper Nova tiers for its stronger instruction-following/JSON reliability after being burned twice by truncation, and because the app already runs on AWS Lambda — the Lambda execution role can be granted `bedrock:InvokeModel` directly, eliminating the API-key-in-SSM secret entirely. Claude's extended thinking is opt-in and left disabled, so the default-on-thinking truncation failure mode this app hit twice with Gemini doesn't apply.)
 - No custom domain, no ACM certificate — HTTPS is served by the AWS-managed certificate on the Lambda Function URL.
-- No VPC — the Lambda function runs outside any VPC (Supabase and the Gemini API are both public HTTPS endpoints).
+- No VPC — the Lambda function runs outside any VPC (Supabase is a public HTTPS endpoint; Amazon Bedrock is called via its regional public API endpoint, not a VPC endpoint).
 - Deployment package is a **zip**, not a container image — no Docker, no ECR.
 - GitHub Actions authenticates to AWS via **OIDC** — no long-lived AWS access keys stored as repo secrets.
-- Secrets (`GEMINI_API_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) live in **SSM Parameter Store** as `SecureString`, created once by hand, and are read by Terraform at `apply` time and injected as Lambda **environment variables** — the app itself makes no AWS API calls at runtime to fetch secrets.
+- Secrets: only `SUPABASE_SERVICE_ROLE_KEY` lives in **SSM Parameter Store** as `SecureString`, created once by hand, read by Terraform at `apply` time and injected as a Lambda **environment variable**. There is no Gemini/Bedrock API key to store — Bedrock access is authorized via the Lambda execution role's IAM policy (`bedrock:InvokeModel`/`bedrock:InvokeModelWithResponseStream`, scoped to the Claude Haiku 4.5 inference profile ARN), so the app *does* make one class of AWS API call at runtime now (Bedrock inference itself), just none to fetch secrets.
 - Terraform state is remote: S3 bucket with native S3 state locking (`use_lockfile = true`, requires Terraform >= 1.10), created once via `infra/bootstrap` (required because CI runs `terraform apply` repeatedly and needs shared, locked state — no DynamoDB lock table; the human partner chose to keep both GitHub Actions workflows but drop the second AWS resource in favor of S3's built-in lockfile).
 - AWS region: `us-east-1` (default, overridable via Terraform variable — no explicit region requirement was given, this is the reasonable low-cost default consistent with the earlier cost estimates in the design spec).
 - Lambda runtime: `nodejs22.x`.
@@ -203,6 +203,8 @@ git commit -m "chore: remove Cloudflare Workers server entry (dead code after dr
 ---
 
 ## Task 3: Add Vitest, make the AI gateway call testable, swap Lovable AI Gateway for direct Gemini call
+
+> **SUPERSEDED (post-implementation, human decision):** this task's code below is the historical record of what was actually built and committed at the time. It was later replaced entirely — first by a same-provider model swap (`gemini-2.5-flash` → `gemini-flash-latest`, both superseded), then by a full provider migration off Gemini to **Amazon Bedrock / Claude Haiku 4.5** (see Global Constraints above for why). The current implementation lives in `src/lib/helion.functions.ts` and calls `callBedrock()` via `@aws-sdk/client-bedrock-runtime`'s `ConverseCommand`, not `callGateway()`/`fetch` as shown here. Do not use this section as a guide for the current codebase — it's kept only as a record of the migration path.
 
 **Files:**
 - Modify: `package.json` (add `vitest` devDependency, add `"test": "vitest run"` script)
@@ -882,12 +884,13 @@ Add to `.gitignore`:
 infra/app/terraform.tfvars
 ```
 
-- [ ] **Step 4: Create the two SSM SecureString parameters by hand (one-time)**
+- [ ] **Step 4: Create the SSM SecureString parameter by hand (one-time)**
 
 ```bash
-aws ssm put-parameter --name "/helion/gemini_api_key" --type SecureString --value "<your real Gemini API key>"
 aws ssm put-parameter --name "/helion/supabase_service_role_key" --type SecureString --value "<your real Supabase service role key>"
 ```
+
+(No Gemini/Bedrock parameter here — Bedrock access is granted via IAM in Step 5 below, not an API key.)
 
 - [ ] **Step 5: Create infra/app/main.tf**
 
@@ -914,9 +917,29 @@ resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-data "aws_ssm_parameter" "gemini_api_key" {
-  name            = "/${var.project_name}/gemini_api_key"
-  with_decryption = true
+# Grants the app's Bedrock access -- no API key: helion.functions.ts calls
+# Bedrock's ConverseCommand using this role's IAM credentials directly.
+# Scoped to the specific Claude Haiku 4.5 cross-region inference profile
+# (and the underlying per-region model ARNs it routes to, which Bedrock
+# requires to also be authorized) rather than "bedrock:*"/"*".
+data "aws_iam_policy_document" "lambda_bedrock" {
+  statement {
+    effect = "Allow"
+    actions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ]
+    resources = [
+      "arn:aws:bedrock:${var.aws_region}:*:inference-profile/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "arn:aws:bedrock:*::foundation-model/anthropic.claude-haiku-4-5-20251001-v1:0",
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "lambda_bedrock" {
+  name   = "${var.project_name}-lambda-bedrock"
+  role   = aws_iam_role.lambda_exec.id
+  policy = data.aws_iam_policy_document.lambda_bedrock.json
 }
 
 data "aws_ssm_parameter" "supabase_service_role_key" {
@@ -937,7 +960,6 @@ resource "aws_lambda_function" "app" {
 
   environment {
     variables = {
-      GEMINI_API_KEY            = data.aws_ssm_parameter.gemini_api_key.value
       SUPABASE_SERVICE_ROLE_KEY = data.aws_ssm_parameter.supabase_service_role_key.value
       SUPABASE_URL              = var.supabase_url
       SUPABASE_PUBLISHABLE_KEY  = var.supabase_publishable_key
@@ -962,6 +984,8 @@ output "lambda_exec_role_arn" {
 }
 ```
 
+Note: Lambda's runtime automatically provides an `AWS_REGION` reserved environment variable (set to the function's deployed region), which `helion.functions.ts`'s `process.env.AWS_REGION || "us-east-1"` picks up without any explicit wiring here.
+
 - [ ] **Step 6: Build and package the first deployable zip**
 
 From the project root (using PowerShell here since this Windows machine has no `zip` CLI on PATH; the GitHub Actions workflow in Task 8 runs on a Linux runner where `zip` is available by default, so it uses that instead):
@@ -982,7 +1006,7 @@ terraform validate
 terraform plan
 ```
 
-Expected: `terraform validate` → `Success!`. `terraform plan` shows 5 resources to add (`aws_iam_role`, `aws_iam_role_policy_attachment`, `aws_lambda_function`, plus the two `data` reads don't count as adds) — confirm no destructive changes are planned.
+Expected: `terraform validate` → `Success!`. `terraform plan` shows 4 resources to add (`aws_iam_role`, `aws_iam_role_policy_attachment`, `aws_iam_role_policy.lambda_bedrock`, `aws_lambda_function` — the `data` reads don't count as adds) — confirm no destructive changes are planned.
 
 - [ ] **Step 8: Apply**
 
@@ -990,7 +1014,7 @@ Expected: `terraform validate` → `Success!`. `terraform plan` shows 5 resource
 terraform apply
 ```
 
-Type `yes`. Expected: `Apply complete! Resources: 3 added, 0 changed, 0 destroyed.`
+Type `yes`. Expected: `Apply complete! Resources: 4 added, 0 changed, 0 destroyed.`
 
 - [ ] **Step 9: Verify the function runs — direct invoke test**
 
@@ -1077,7 +1101,7 @@ Expected: `200`.
 
 - [ ] **Step 4: Verify the AI call works end-to-end through the deployed Lambda**
 
-Open `$URL` in a browser (or use `curl` against whatever form-submit route the app uses), submit a real term (e.g. "API") through the UI, and confirm a real Gemini-generated explanation renders — this proves the SSM-sourced `GEMINI_API_KEY` env var, the direct Gemini call from Task 3, and the Lambda deployment all work together in the real AWS environment, not just locally.
+Open `$URL` in a browser (or use `curl` against whatever form-submit route the app uses), submit a real term (e.g. "API") through the UI, and confirm a real Claude Haiku-generated explanation renders — this proves the Lambda execution role's `bedrock:InvokeModel` IAM permission (Task 6), the Bedrock call in `helion.functions.ts`, and the Lambda deployment all work together in the real AWS environment, not just locally.
 
 - [ ] **Step 5: Check logs if anything failed**
 

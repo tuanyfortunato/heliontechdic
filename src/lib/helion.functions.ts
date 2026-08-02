@@ -1,11 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
+import { BedrockRuntimeClient, ConverseCommand } from "@aws-sdk/client-bedrock-runtime";
 
-const GATEWAY_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-// gemini-2.5-flash returns 404 "no longer available to new users" for
-// newly-created API keys/projects; gemini-flash-latest is the current
-// flash-tier alias and works with this key (verified against the real
-// endpoint).
-const MODEL = "gemini-flash-latest";
+// Cross-region inference profile ID -- Claude Haiku 4.5 rejects direct
+// on-demand invocation by its bare model ID ("Invocation of model ID ...
+// with on-demand throughput isn't supported"); it must be invoked through
+// an inference profile. Verified against the real Bedrock endpoint.
+const MODEL_ID = "us.anthropic.claude-haiku-4-5-20251001-v1:0";
+const REGION = process.env.AWS_REGION || "us-east-1";
+
+// No API key: auth is via the caller's/Lambda's IAM credentials (SigV4),
+// picked up automatically from the environment (~/.aws credentials locally,
+// the execution role in Lambda).
+const bedrockClient = new BedrockRuntimeClient({ region: REGION });
 
 type Mode = "casual" | "tecnica";
 type Length = "curta" | "longa";
@@ -64,61 +70,62 @@ Se for sobre tecnologia:
 - Responda em texto puro (sem JSON, sem markdown com #). Pode usar **negrito** para destaque.`;
 }
 
-export async function callGateway(
-  body: unknown,
-  fetchImpl: typeof fetch = fetch,
+type ImageFormat = "png" | "jpeg" | "webp" | "gif";
+type ContentBlock = { text: string } | { image: { format: ImageFormat; source: { bytes: Uint8Array } } };
+
+function parseDataUrl(dataUrl: string): { format: ImageFormat; source: { bytes: Uint8Array } } {
+  const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
+  if (!match) throw new Error("Formato de imagem não suportado.");
+  const format = (match[1] === "jpg" ? "jpeg" : match[1]) as ImageFormat;
+  return { format, source: { bytes: new Uint8Array(Buffer.from(match[2], "base64")) } };
+}
+
+export async function callBedrock(
+  system: string,
+  userContent: ContentBlock[],
+  maxTokens: number,
+  client: Pick<BedrockRuntimeClient, "send"> = bedrockClient,
 ): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
-  const res = await fetchImpl(GATEWAY_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    if (res.status === 429) throw new Error("Limite de requisições. Tente novamente em instantes.");
-    if (res.status === 402) throw new Error("Créditos esgotados na conta do Gemini.");
-    throw new Error(`Gateway ${res.status}: ${text.slice(0, 200)}`);
+  try {
+    const res = await client.send(
+      new ConverseCommand({
+        modelId: MODEL_ID,
+        system: [{ text: system }],
+        messages: [{ role: "user", content: userContent }],
+        inferenceConfig: { maxTokens },
+      }),
+    );
+    const block = res.output?.message?.content?.[0];
+    return block && "text" in block ? (block.text ?? "") : "";
+  } catch (err: any) {
+    if (err?.name === "ThrottlingException") throw new Error("Limite de requisições. Tente novamente em instantes.");
+    throw new Error(`Bedrock ${err?.name ?? "error"}: ${String(err?.message ?? err).slice(0, 200)}`);
   }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? "";
 }
 
 export const humanize = createServerFn({ method: "POST" })
   .inputValidator((d: HumanizeInput) => d)
   .handler(async ({ data }) => {
-    const userContent: any[] = [];
     const isCode = data.analise === "codigo" && !!data.imageDataUrl;
     const userText = isCode
       ? `Analise o código presente nesta imagem conforme as instruções do sistema (linguagem, propósito, linha a linha, boas práticas).${data.termo ? ` Contexto do usuário: "${data.termo}".` : ""}`
       : data.imageDataUrl
       ? `Identifique e explique os jargões, siglas ou expressões técnicas presentes nesta imagem.${data.termo ? ` Contexto adicional do usuário: "${data.termo}".` : ""}`
       : `Explique o seguinte termo/sigla/expressão de tecnologia: "${data.termo}"`;
-    userContent.push({ type: "text", text: userText });
+    const userContent: ContentBlock[] = [{ text: userText }];
     if (data.imageDataUrl) {
-      userContent.push({
-        type: "image_url",
-        image_url: { url: data.imageDataUrl },
-      });
+      userContent.push({ image: parseDataUrl(data.imageDataUrl) });
     }
 
-    const content = await callGateway({
-      model: MODEL,
-      max_tokens: 1200,
-      // gemini-flash-latest's thinking (reasoning) tokens count against
-      // max_tokens and can consume the whole budget before any visible
-      // content is emitted, truncating the response mid-sentence
-      // (finish_reason: "length") -- "low" leaves enough headroom.
-      reasoning_effort: "low",
-      messages: [
-        { role: "system", content: systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao") },
-        { role: "user", content: userContent },
-      ],
-    });
+    // Claude's extended thinking is opt-in (unlike Gemini's default-on
+    // thinking, which repeatedly ate the max_tokens budget and truncated
+    // responses) -- it's left disabled here, so the whole budget goes to
+    // visible output.
+    const content = await callBedrock(
+      systemPrompt(data.modo, data.tamanho, data.analise ?? "padrao"),
+      userContent,
+      1200,
+    );
 
     const trimmed = content.trim();
     if (trimmed.includes('"fora_de_escopo"') && trimmed.includes("true")) {
@@ -160,25 +167,14 @@ export const deepDive = createServerFn({ method: "POST" })
   .inputValidator((d: DeepDiveInput) => d)
   .handler(async ({ data }) => {
     const isCode = data.analise === "codigo";
-    const content = await callGateway({
-      model: MODEL,
-      // Generous headroom: even with reasoning_effort "low", the model
-      // behind the "-latest" alias can drift to a more verbose version
-      // over time (observed truncating a padrão response at ~1800 tokens
-      // after already emitting full profundidade+exemplo fields) -- see
-      // humanize() above for why reasoning_effort is set at all.
-      max_tokens: isCode ? 4200 : 3200,
-      reasoning_effort: "low",
-      messages: [
-        { role: "system", content: isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO },
-        {
-          role: "user",
-          content: isCode
-            ? `Linguagem/termo: ${data.termo}.${data.contextoCodigo ? ` Contexto do código analisado: ${data.contextoCodigo}` : ""}`
-            : `Termo: ${data.termo}`,
-        },
-      ],
-    });
+    const userText = isCode
+      ? `Linguagem/termo: ${data.termo}.${data.contextoCodigo ? ` Contexto do código analisado: ${data.contextoCodigo}` : ""}`
+      : `Termo: ${data.termo}`;
+    const content = await callBedrock(
+      isCode ? DEEP_SYSTEM_CODIGO : DEEP_SYSTEM_PADRAO,
+      [{ text: userText }],
+      isCode ? 4200 : 3200,
+    );
     let jsonText = content.trim();
     const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/);
     if (fence) jsonText = fence[1].trim();
@@ -209,7 +205,7 @@ export const deepDive = createServerFn({ method: "POST" })
         exemplosLinks: parseLinks(parsed.exemplosLinks),
       };
     } catch {
-      // The gateway response got cut off mid-JSON (hit max_tokens before
+      // The Bedrock response got cut off mid-JSON (hit max_tokens before
       // closing the object). Rather than show the broken JSON verbatim,
       // salvage whichever string fields the model DID finish writing --
       // each closed field is still valid within an otherwise-truncated
