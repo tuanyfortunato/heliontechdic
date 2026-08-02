@@ -108,6 +108,56 @@ export async function callBedrock(
   }
 }
 
+const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+// gemini-2.5-flash returns 404 ("no longer available to new users") for
+// newly-created API keys/projects; gemini-flash-latest is the current
+// flash-tier alias and works with this key (verified against the real
+// Gemini endpoint in the app's Gemini-only era, commit 55c88cf).
+const GEMINI_MODEL = "gemini-flash-latest";
+
+export type GeminiContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image_url"; image_url: { url: string } };
+
+export async function callGemini(
+  system: string,
+  userContent: GeminiContentBlock[],
+  maxTokens: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY not configured");
+  const res = await fetchImpl(GEMINI_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: GEMINI_MODEL,
+      max_tokens: maxTokens,
+      // gemini-flash-latest's thinking (reasoning) tokens count against
+      // max_tokens and can consume the whole budget before any visible
+      // content is emitted, truncating the response mid-sentence
+      // (finish_reason: "length") -- "low" leaves enough headroom.
+      // Verified against the real Gemini endpoint (commits d8e93e1, 54eb978).
+      reasoning_effort: "low",
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userContent },
+      ],
+    }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    if (res.status === 429) throw new Error("Limite de requisições. Tente novamente em instantes.");
+    if (res.status === 402) throw new Error("Créditos esgotados na conta do Gemini.");
+    throw new Error(`Gemini ${res.status}: ${text.slice(0, 200)}`);
+  }
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content ?? "";
+}
+
 export const humanize = createServerFn({ method: "POST" })
   .inputValidator((d: HumanizeInput) => d)
   .handler(async ({ data }) => {
