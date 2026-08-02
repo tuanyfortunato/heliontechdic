@@ -6,18 +6,17 @@ Se o termo/imagem não for sobre tecnologia, a IA responde que está fora do esc
 
 ## Stack técnica
 
-| Camada | Tecnologia |
-|---|---|
-| Framework | [TanStack Start](https://tanstack.com/start) (SSR) + [TanStack Router](https://tanstack.com/router) |
-| UI | React 19, Tailwind CSS 4, componentes Radix UI no estilo [shadcn/ui](https://ui.shadcn.com) |
-| Dados/estado | TanStack Query |
-| Build | Vite 7 + Nitro (preset `aws-lambda`, streaming habilitado) |
-| Backend-as-a-service | Supabase (`@supabase/supabase-js`) — cliente, cliente admin e middleware de auth já escafoldados em `src/integrations/supabase/`, ainda não consumidos pela UI |
-| IA | **Amazon Bedrock** — Claude Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`), chamado via `@aws-sdk/client-bedrock-runtime` (`ConverseCommand`), autenticado por credenciais IAM (não há API key) |
-| Runtime alvo | AWS Lambda, invocado via Function URL pública (`RESPONSE_STREAM`) — sem API Gateway, sem ALB, sem VPC |
-| Infraestrutura como código | Terraform (`infra/bootstrap`, `infra/app`) |
-| Testes | Vitest |
-| Gerenciador de pacotes | [Bun](https://bun.sh) |
+| Camada                     | Tecnologia                                                                                                                                                                                                 |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Framework                  | [TanStack Start](https://tanstack.com/start) (SSR) + [TanStack Router](https://tanstack.com/router)                                                                                                        |
+| UI                         | React 19, Tailwind CSS 4, componentes Radix UI no estilo [shadcn/ui](https://ui.shadcn.com)                                                                                                                |
+| Dados/estado               | TanStack Query                                                                                                                                                                                             |
+| Build                      | Vite 7 + Nitro (preset `aws-lambda`, streaming habilitado)                                                                                                                                                 |
+| IA                         | **Amazon Bedrock** — Claude Haiku 4.5 (`us.anthropic.claude-haiku-4-5-20251001-v1:0`), chamado via `@aws-sdk/client-bedrock-runtime` (`ConverseCommand`), autenticado por credenciais IAM (não há API key) |
+| Runtime alvo               | AWS Lambda, invocado via Function URL pública (`RESPONSE_STREAM`) — sem API Gateway, sem ALB, sem VPC                                                                                                      |
+| Infraestrutura como código | Terraform (`infra/bootstrap`, `infra/app`)                                                                                                                                                                 |
+| Testes                     | Vitest                                                                                                                                                                                                     |
+| Gerenciador de pacotes     | [Bun](https://bun.sh)                                                                                                                                                                                      |
 
 ## Estrutura do projeto
 
@@ -31,7 +30,6 @@ src/
     helion.functions.test.ts   # testes da integração com o Bedrock (client mockado)
     error-page.ts               # página HTML de erro genérica
     utils.ts
-  integrations/supabase/        # clientes Supabase (client, admin, middlewares de auth)
   components/ui/                 # componentes shadcn/ui (Radix + Tailwind)
   start.ts                        # configuração do TanStack Start (middlewares globais)
   router.tsx                       # criação do router + query client
@@ -39,7 +37,6 @@ infra/
   bootstrap/                        # Terraform: state backend (S3) + roles OIDC do GitHub Actions
                                       # (código escrito, ainda não aplicado — ver "Status atual")
   app/                                # Terraform: Lambda + IAM + Function URL (ainda não implementado)
-supabase/config.toml                  # id do projeto Supabase
 vite.config.ts                        # Nitro com preset aws-lambda
 ```
 
@@ -49,12 +46,8 @@ A aplicação é essencialmente uma única rota (`/`) com um formulário complex
 
 Crie um arquivo `.env` (veja `.env.example`) com:
 
-| Variável | Uso |
-|---|---|
-| `VITE_SUPABASE_URL` / `SUPABASE_URL` | URL do projeto Supabase |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` / `SUPABASE_PUBLISHABLE_KEY` | Chave pública (anon) do Supabase |
-| `VITE_SUPABASE_PROJECT_ID` | Id do projeto Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço (server-side apenas, bypassa RLS) — necessária apenas se `client.server.ts` for usado |
+| Variável                | Uso                                               |
+| ----------------------- | ------------------------------------------------- |
 | `AWS_REGION` (opcional) | Região do Bedrock — padrão `us-east-1` se omitida |
 
 **Não há API key de IA para configurar.** O acesso ao Bedrock é via credenciais IAM: rode `aws configure` (ou `aws sso login`) localmente antes de `bun run dev`, para que o SDK da AWS encontre suas credenciais automaticamente. Em produção, a Lambda usa sua própria role de execução (sem credenciais explícitas).

@@ -71,7 +71,9 @@ Se for sobre tecnologia:
 }
 
 type ImageFormat = "png" | "jpeg" | "webp" | "gif";
-type ContentBlock = { text: string } | { image: { format: ImageFormat; source: { bytes: Uint8Array } } };
+type ContentBlock =
+  | { text: string }
+  | { image: { format: ImageFormat; source: { bytes: Uint8Array } } };
 
 function parseDataUrl(dataUrl: string): { format: ImageFormat; source: { bytes: Uint8Array } } {
   const match = dataUrl.match(/^data:image\/(png|jpe?g|webp|gif);base64,(.+)$/);
@@ -98,8 +100,11 @@ export async function callBedrock(
     const block = res.output?.message?.content?.[0];
     return block && "text" in block ? (block.text ?? "") : "";
   } catch (err: any) {
-    if (err?.name === "ThrottlingException") throw new Error("Limite de requisições. Tente novamente em instantes.");
-    throw new Error(`Bedrock ${err?.name ?? "error"}: ${String(err?.message ?? err).slice(0, 200)}`);
+    if (err?.name === "ThrottlingException")
+      throw new Error("Limite de requisições. Tente novamente em instantes.");
+    throw new Error(
+      `Bedrock ${err?.name ?? "error"}: ${String(err?.message ?? err).slice(0, 200)}`,
+    );
   }
 }
 
@@ -110,8 +115,8 @@ export const humanize = createServerFn({ method: "POST" })
     const userText = isCode
       ? `Analise o código presente nesta imagem conforme as instruções do sistema (linguagem, propósito, linha a linha, boas práticas).${data.termo ? ` Contexto do usuário: "${data.termo}".` : ""}`
       : data.imageDataUrl
-      ? `Identifique e explique os jargões, siglas ou expressões técnicas presentes nesta imagem.${data.termo ? ` Contexto adicional do usuário: "${data.termo}".` : ""}`
-      : `Explique o seguinte termo/sigla/expressão de tecnologia: "${data.termo}"`;
+        ? `Identifique e explique os jargões, siglas ou expressões técnicas presentes nesta imagem.${data.termo ? ` Contexto adicional do usuário: "${data.termo}".` : ""}`
+        : `Explique o seguinte termo/sigla/expressão de tecnologia: "${data.termo}"`;
     const userContent: ContentBlock[] = [{ text: userText }];
     if (data.imageDataUrl) {
       userContent.push({ image: parseDataUrl(data.imageDataUrl) });

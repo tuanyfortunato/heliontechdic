@@ -28,7 +28,9 @@ describe("callBedrock", () => {
   });
 
   it("throws a friendly message on ThrottlingException", async () => {
-    const err = Object.assign(new Error("Too many tokens per day"), { name: "ThrottlingException" });
+    const err = Object.assign(new Error("Too many tokens per day"), {
+      name: "ThrottlingException",
+    });
     const sendMock = vi.fn().mockRejectedValue(err);
 
     await expect(callBedrock("s", [{ text: "hi" }], 100, { send: sendMock })).rejects.toThrow(

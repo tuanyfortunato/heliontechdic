@@ -73,10 +73,18 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "HELION · Glossário de Tecnologia" },
-      { name: "description", content: "HELION — glossário interativo de tecnologia: humaniza jargões, siglas e expressões técnicas com IA." },
+      {
+        name: "description",
+        content:
+          "HELION — glossário interativo de tecnologia: humaniza jargões, siglas e expressões técnicas com IA.",
+      },
       { name: "author", content: "HELION" },
       { property: "og:title", content: "HELION · Glossário de Tecnologia" },
-      { property: "og:description", content: "Iluminando o conhecimento tech — humanize qualquer termo, sigla ou captura de tela." },
+      {
+        property: "og:description",
+        content:
+          "Iluminando o conhecimento tech — humanize qualquer termo, sigla ou captura de tela.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
     ],
